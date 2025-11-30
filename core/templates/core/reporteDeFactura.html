@@ -1,0 +1,306 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte Detallado de Facturas SAGA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="{% static 'core/css/styles.css' %}">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'saga-red': '#e53e3e',
+                        'saga-dark': '#1A202C',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 text-saga-dark min-h-screen p-4 sm:p-8">
+    
+    <div class="container mx-auto max-w-7xl">
+        
+        <!-- Encabezado del Reporte -->
+        <header class="mb-6 border-b pb-4 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <a href="{% url 'panel_admin' %}">
+                    <button class="px-4 py-2 bg-[#e53e3e] hover:bg-red-700 text-white rounded-lg transition flex items-center gap-2 font-semibold">
+                        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                        Volver
+                    </button>
+                </a>
+                <img src="{% static 'core/img/saga-logo.png' %}" alt="SAGA" class="w-24 h-auto">
+                <h1 class="text-3xl font-extrabold text-saga-dark">
+                    Reporte Detallado de Facturas
+                </h1>
+            </div>
+            <p class="text-gray-500 mt-1 text-right">Vista de todas las Facturas generadas en el sistema.</p>
+        </header>
+
+        <!-- Controles de Filtrado y Búsqueda -->
+        <div class="bg-white p-5 rounded-xl shadow-lg mb-6 border border-gray-100">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                
+                <!-- Filtro de Búsqueda General -->
+                <div class="md:col-span-2">
+                    <label for="search-input" class="block text-xs font-medium text-gray-700 mb-1">Buscar (ID/Cliente/Producto)</label>
+                    <div class="relative">
+                        <input type="text" id="search-input" placeholder="Buscar..." 
+                            class="w-full p-2 pl-10 border border-gray-300 rounded-lg focus:ring-saga-red focus:border-saga-red text-sm"
+                            onkeyup="applyFilters()">
+                        <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2"></i>
+                    </div>
+                </div>
+
+                <!-- Filtro por Estado -->
+                <div>
+                    <label for="filter-status" class="block text-xs font-medium text-gray-700 mb-1">Estado de Pago</label>
+                    <select id="filter-status" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-saga-red focus:border-saga-red text-sm" onchange="applyFilters()">
+                        <option value="">Todos los Estados</option>
+                        <option value="Completado">Completado</option>
+                        <option value="Pendiente">Pendiente</option>
+                        <option value="Cancelado">Cancelado</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla de Reporte Detallado -->
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider sortable cursor-pointer" onclick="sortTable('id')">
+                                ID Factura <span class="sort-icon" data-key="id"></span>
+                            </th>
+                            <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider sortable cursor-pointer" onclick="sortTable('date')">
+                                Fecha <span class="sort-icon" data-key="date"></span>
+                            </th>
+                            <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider sortable cursor-pointer" onclick="sortTable('client')">
+                                Cliente <span class="sort-icon" data-key="client"></span>
+                            </th>
+                            <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider sortable cursor-pointer" onclick="sortTable('product')">
+                                Producto Clave <span class="sort-icon" data-key="product"></span>
+                            </th>
+                            <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider sortable cursor-pointer" onclick="sortTable('subtotal')">
+                                Subtotal <span class="sort-icon" data-key="subtotal"></span>
+                            </th>
+                            <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider sortable cursor-pointer" onclick="sortTable('tax')">
+                                Impuesto <span class="sort-icon" data-key="tax"></span>
+                            </th>
+                            <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider sortable cursor-pointer" onclick="sortTable('total')">
+                                Monto Total <span class="sort-icon" data-key="total"></span>
+                            </th>
+                            <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider sortable cursor-pointer" onclick="sortTable('status')">
+                                Estado <span class="sort-icon" data-key="status"></span>
+                            </th>
+                            <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider sortable cursor-pointer" onclick="sortTable('transactionId')">
+                                ID Transacción <span class="sort-icon" data-key="transactionId"></span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoice-table-body" class="bg-white divide-y divide-gray-200">
+                        <!-- Las filas se insertarán con JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Controles de Paginación -->
+            <div id="pagination-controls" class="p-4 border-t flex justify-between items-center text-sm">
+                <button onclick="changePage(-1)" class="px-3 py-1 border rounded-lg hover:bg-gray-100 disabled:opacity-50" id="prev-button">
+                    <i data-lucide="chevron-left" class="w-4 h-4 inline-block"></i> Anterior
+                </button>
+                <span id="page-info" class="text-gray-600">Página 1 de 1</span>
+                <button onclick="changePage(1)" class="px-3 py-1 border rounded-lg hover:bg-gray-100 disabled:opacity-50" id="next-button">
+                    Siguiente <i data-lucide="chevron-right" class="w-4 h-4 inline-block"></i>
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        lucide.createIcons();
+        
+        // DATOS REALES DESDE EL BACKEND
+        const INVOICES = JSON.parse('{{ facturas_json|escapejs }}');
+        
+        let currentData = [...INVOICES];
+        let currentPage = 1;
+        const rowsPerPage = 10;
+        let sortState = { key: 'fecha', direction: 'desc' };
+
+        const formatCurrency = (amount) => `$${(amount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
+        
+        function getStatusBadge(status) {
+            let colorClass = '';
+            switch (status) {
+                case 'Completado':
+                    colorClass = 'bg-green-100 text-green-800';
+                    break;
+                case 'Pendiente':
+                    colorClass = 'bg-yellow-100 text-yellow-800';
+                    break;
+                case 'Cancelado':
+                    colorClass = 'bg-red-100 text-red-800';
+                    break;
+                default:
+                    colorClass = 'bg-gray-100 text-gray-800';
+            }
+            return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${colorClass}">${status}</span>`;
+        }
+        
+        function applyFilters() {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            const filterStatus = document.getElementById('filter-status').value;
+
+            let filtered = INVOICES.filter(invoice => {
+                const textMatch = (
+                    invoice.cliente.toLowerCase().includes(searchTerm) || 
+                    invoice.id.toLowerCase().includes(searchTerm) ||
+                    invoice.producto.toLowerCase().includes(searchTerm) ||
+                    invoice.transaccion_id.toLowerCase().includes(searchTerm)
+                );
+                
+                const statusMatch = !filterStatus || invoice.estado === filterStatus;
+
+                return textMatch && statusMatch;
+            });
+            
+            currentData = filtered;
+            sortData(sortState.key, sortState.direction, false); 
+            currentPage = 1;
+            renderTable();
+        }
+        window.applyFilters = applyFilters;
+        
+        function sortData(key, direction, shouldRender = true) {
+            const isNumeric = ['subtotal', 'impuesto', 'total'].includes(key);
+
+            currentData.sort((a, b) => {
+                const aValue = isNumeric ? a[key] : a[key].toString().toLowerCase();
+                const bValue = isNumeric ? b[key] : b[key].toString().toLowerCase();
+
+                if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+                if (aValue > bValue) return direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+            
+            if (shouldRender) {
+                sortState = { key, direction };
+                updateSortIcons();
+                renderTable();
+            }
+        }
+
+        function sortTable(key) {
+            let direction = 'asc';
+            if (sortState.key === key) {
+                direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+            }
+            sortData(key, direction);
+        }
+        window.sortTable = sortTable;
+
+        function updateSortIcons() {
+            document.querySelectorAll('.sort-icon').forEach(icon => {
+                icon.innerHTML = '';
+            });
+
+            const currentIcon = document.querySelector(`.sort-icon[data-key="${sortState.key}"]`);
+            if (currentIcon) {
+                if (sortState.direction === 'asc') {
+                    currentIcon.innerHTML = `<i data-lucide="chevron-up" class="w-3 h-3 inline ml-1"></i>`;
+                } else {
+                    currentIcon.innerHTML = `<i data-lucide="chevron-down" class="w-3 h-3 inline ml-1"></i>`;
+                }
+            }
+            lucide.createIcons();
+        }
+
+        function renderTable() {
+            const body = document.getElementById('invoice-table-body');
+            body.innerHTML = '';
+            
+            const start = (currentPage - 1) * rowsPerPage;
+            const end = start + rowsPerPage;
+            const pageData = currentData.slice(start, end);
+
+            if (pageData.length === 0) {
+                const row = body.insertRow();
+                row.innerHTML = '<td colspan="9" class="px-3 py-8 text-center text-gray-500">No hay facturas registradas</td>';
+                updatePaginationControls();
+                return;
+            }
+
+            pageData.forEach(invoice => {
+                const row = body.insertRow();
+                row.className = 'hover:bg-gray-50 transition duration-100';
+                
+                row.insertCell().className = 'px-3 py-3 whitespace-nowrap text-center font-medium text-gray-800';
+                row.cells[0].textContent = invoice.id;
+                
+                row.insertCell().className = 'px-3 py-3 whitespace-nowrap text-center text-gray-700';
+                row.cells[1].textContent = new Date(invoice.fecha).toLocaleDateString('es-ES');
+                
+                row.insertCell().className = 'px-3 py-3 whitespace-nowrap text-center text-gray-700';
+                row.cells[2].textContent = invoice.cliente;
+
+                row.insertCell().className = 'px-3 py-3 whitespace-nowrap text-center font-medium text-saga-dark';
+                row.cells[3].textContent = invoice.producto;
+
+                row.insertCell().className = 'px-3 py-3 whitespace-nowrap text-center text-gray-700';
+                row.cells[4].textContent = formatCurrency(invoice.subtotal);
+                
+                row.insertCell().className = 'px-3 py-3 whitespace-nowrap text-center text-gray-700';
+                row.cells[5].textContent = formatCurrency(invoice.impuesto);
+
+                row.insertCell().className = 'px-3 py-3 whitespace-nowrap text-center font-bold text-saga-dark';
+                row.cells[6].textContent = formatCurrency(invoice.total);
+
+                row.insertCell().className = 'px-3 py-3 whitespace-nowrap text-center';
+                row.cells[7].innerHTML = getStatusBadge(invoice.estado);
+
+                row.insertCell().className = 'px-3 py-3 whitespace-nowrap text-center text-gray-500 font-mono text-xs';
+                row.cells[8].textContent = invoice.transaccion_id;
+            });
+
+            updatePaginationControls();
+        }
+
+        function updatePaginationControls() {
+            const totalPages = Math.ceil(currentData.length / rowsPerPage);
+            
+            document.getElementById('page-info').textContent = `Página ${totalPages === 0 ? 0 : currentPage} de ${totalPages}`;
+            document.getElementById('prev-button').disabled = currentPage === 1 || totalPages === 0;
+            document.getElementById('next-button').disabled = currentPage === totalPages || totalPages === 0;
+        }
+
+        function changePage(direction) {
+            const totalPages = Math.ceil(currentData.length / rowsPerPage);
+            const newPage = currentPage + direction;
+            
+            if (newPage >= 1 && newPage <= totalPages) {
+                currentPage = newPage;
+                renderTable();
+            }
+        }
+        window.changePage = changePage;
+
+        window.onload = function() {
+            sortData(sortState.key, sortState.direction); 
+            updateSortIcons();
+        }
+    </script>
+</body>
+</html>

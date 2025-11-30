@@ -1,0 +1,147 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración SAGA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .dashboard-bg {
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+        }
+        .saga-red {
+            color: #dc2626;
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 25px -5px rgba(220, 38, 38, 0.2);
+        }
+    </style>
+</head>
+<body class="dashboard-bg min-h-screen">
+
+    <!-- HEADER con LOGO SAGA -->
+    <header class="sticky top-0 z-40 bg-white shadow-md border-b-4 border-red-600">
+        <div class="flex items-center justify-between py-4 px-6 max-w-7xl mx-auto">
+            <!-- Logo -->
+            <a href="{% url 'index' %}" class="flex items-center">
+                <img src="{% static 'core/img/saga-logo.png' %}" class="w-20 h-auto" alt="SAGA Logo">
+            </a>
+
+            <!-- Título -->
+            <h1 class="text-3xl font-bold text-gray-800">
+                Panel de <span class="text-red-600">Administración</span>
+            </h1>
+
+            <!-- Botón Cerrar Sesión -->
+            <a href="{% url 'logout' %}" class="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                <i data-lucide="log-out" class="w-4 h-4"></i>
+                Cerrar Sesión
+            </a>
+        </div>
+    </header>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="max-w-7xl mx-auto py-12 px-6">
+        
+        <!-- Descripción -->
+        <div class="text-center mb-12">
+            <h2 class="text-4xl font-extrabold text-gray-800 mb-3">
+                Bienvenido, <span class="text-red-600">{{ request.session.user_username }}</span>
+            </h2>
+            <p class="text-xl text-gray-600">
+                Selecciona una opción para administrar SAGA
+            </p>
+        </div>
+
+        <!-- GRID DE OPCIONES -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
+
+            <!-- Tarjeta 1: Añadir Juegos -->
+            <a href="{% url 'anadir_juegos' %}" class="card-hover group">
+                <div class="bg-white p-8 rounded-xl shadow-lg border-l-4 border-red-600 h-full">
+                    <div class="flex items-center justify-between mb-4">
+                        <i data-lucide="gamepad-2" class="w-10 h-10 text-red-600"></i>
+                        <span class="text-3xl"></span>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-800 group-hover:text-red-600 transition mb-2">
+                        Gestionar Juegos
+                    </h3>
+                    <p class="text-gray-600 text-sm">
+                        Añadir, editar o eliminar productos del catálogo. Gestiona el inventario y las claves de juego.
+                    </p>
+                </div>
+            </a>
+
+            <!-- Tarjeta 2: Listado de Clientes -->
+            <a href="{% url 'listado_clientes' %}" class="card-hover group">
+                <div class="bg-white p-8 rounded-xl shadow-lg border-l-4 border-blue-600 h-full">
+                    <div class="flex items-center justify-between mb-4">
+                        <i data-lucide="users" class="w-10 h-10 text-blue-600"></i>
+                        <span class="text-3xl"></span>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-800 group-hover:text-blue-600 transition mb-2">
+                        Listado de Clientes
+                    </h3>
+                    <p class="text-gray-600 text-sm">
+                        Ver y administrar la base de datos completa de usuarios registrados en el sistema.
+                    </p>
+                </div>
+            </a>
+
+            <!-- Tarjeta 3: Reporte de Facturas -->
+            <a href="{% url 'reporte_factura' %}" class="card-hover group">
+                <div class="bg-white p-8 rounded-xl shadow-lg border-l-4 border-yellow-600 h-full">
+                    <div class="flex items-center justify-between mb-4">
+                        <i data-lucide="receipt" class="w-10 h-10 text-yellow-600"></i>
+                        <span class="text-3xl"></span>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-800 group-hover:text-yellow-600 transition mb-2">
+                        Reporte de Facturas
+                    </h3>
+                    <p class="text-gray-600 text-sm">
+                        Acceso al historial detallado de todas las facturas y transacciones realizadas.
+                    </p>
+                </div>
+            </a>
+
+            <!-- Tarjeta 4: Reporte de Ventas -->
+            <a href="{% url 'reporte_ventas' %}" class="card-hover group">
+                <div class="bg-white p-8 rounded-xl shadow-lg border-l-4 border-purple-600 h-full">
+                    <div class="flex items-center justify-between mb-4">
+                        <i data-lucide="bar-chart-3" class="w-10 h-10 text-purple-600"></i>
+                        <span class="text-3xl"></span>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-800 group-hover:text-purple-600 transition mb-2">
+                        Reporte de Ventas
+                    </h3>
+                    <p class="text-gray-600 text-sm">
+                        Análisis de métricas, tendencias y estadísticas de rendimiento del negocio.
+                    </p>
+                </div>
+            </a>
+
+        </div>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-gray-800 text-white py-6 mt-16">
+        <div class="max-w-7xl mx-auto text-center">
+            <p class="text-gray-400">© 2025 SAGA - Todos los derechos reservados</p>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+    </script>
+
+</body>
+</html>

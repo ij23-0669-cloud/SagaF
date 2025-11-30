@@ -1,0 +1,532 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAGA - Tienda de Videojuegos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest" defer></script>
+    <link rel="stylesheet" href="{% static 'core/css/styles.css' %}">
+    
+    <script>
+    // Funciones globales (fuera de DOMContentLoaded)
+
+    function scrollCarousel(sectionId, direction) {
+    const carousel = document.getElementById(`${sectionId}-carousel`);
+    if (!carousel) return;
+
+    // Ancho aproximado de cada card (260px) + gap (~20px)
+    const scrollAmount = 1000;
+
+    carousel.scrollBy({
+        left: direction * scrollAmount,
+        behavior: "smooth"
+    });
+}
+
+    function getCookie(name) {
+        const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return v ? v.pop() : '';
+    }
+
+    function addToCart(productId) {
+        const csrftoken = getCookie('csrftoken');
+        fetch('/api/cart/add/', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify({ producto_id: productId, cantidad: 1 })
+        })
+        .then(r => r.json())
+        .then(json => {
+            if (json.ok) {
+                alertMessage('Producto añadido al carrito', 'success');
+            } else {
+                if (json.error === 'not_authenticated') {
+                    alertMessage('Debes iniciar sesión', 'error');
+                } else {
+                    alertMessage('Error al añadir', 'error');
+                }
+            }
+        })
+        .catch(err => { console.error(err); alertMessage('Error de red', 'error'); });
+    }
+
+    function alertMessage(message, type = 'info') {
+        const container = document.getElementById('alert-container');
+        if (!container) return;
+        const alertBox = document.createElement('div');
+        let classes = 'p-3 rounded-xl shadow-xl mb-2 transition-opacity duration-300 opacity-0 transform translate-y-2';
+        let icon = 'info';
+        if (type === 'success') { classes += ' bg-green-600 text-white'; icon = 'check-circle'; }
+        else if (type === 'error') { classes += ' bg-red-600 text-white'; icon = 'alert-triangle'; }
+        else { classes += ' bg-blue-600 text-white'; }
+        alertBox.className = classes;
+        alertBox.innerHTML = `<div class="flex items-center"><i data-lucide="${icon}" class="w-5 h-5 mr-3"></i><span>${message}</span></div>`;
+        container.appendChild(alertBox);
+        if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons();
+        setTimeout(() => { alertBox.classList.remove('opacity-0', 'translate-y-2'); }, 10);
+        setTimeout(() => { alertBox.classList.add('opacity-0', 'translate-y-2'); setTimeout(() => alertBox.remove(), 300); }, 3000);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        let allProducts = [];
+        let currentFiltered = [];
+
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        };
+
+        function safeCreateIcons() {
+            try { if (window.lucide && typeof lucide.createIcons === 'function') lucide.createIcons(); }
+            catch (e) { console.warn('lucide.createIcons error', e); }
+        }
+
+        function createGameCardHtml(game) {
+            const price = parseFloat(game.precio) || 0;
+            const priceText = price === 0 ? 'Gratis' : `$${price.toFixed(2)}`;
+            const isFree = price === 0;
+            const bgColor = isFree ? '#22c55e' : '#dc2626';
+            const hoverBgColor = isFree ? '#16a34a' : '#b91c1c';
+            const imageUrl = game.imagen_url || 'https://placehold.co/400x225/e5e5e5/333333?text=SAGA';
+
+            return `
+                <div class="game-card bg-card-light rounded-xl shadow-lg overflow-hidden border border-gray-200 transition duration-300 hover:border-saga-red hover:shadow-xl hover:scale-[1.01] min-w-[280px] flex-shrink-0">
+                    <img src="${imageUrl}" alt="${(game.nombre || '').replace(/"/g,'')}" class="w-full h-48 object-cover" onerror="this.onerror=null; this.src='https://placehold.co/400x225/e5e5e5/333333?text=SAGA';" />
+                    <div class="p-4 space-y-3">
+                        <h3 class="text-lg font-semibold text-gray-800 line-clamp-2">${game.nombre || '—'}</h3>
+                        <p class="text-xs text-gray-500 font-mono">${game.plataforma || 'N/A'}</p>
+                        <div class="flex items-center justify-between pt-2 gap-2">
+                            <span class="text-xl font-extrabold ${price === 0 ? 'text-green-500' : 'text-saga-red'}">${priceText}</span>
+                            <button onclick="addToCart(${game.id_producto})" 
+                                style="background-color: ${bgColor};" 
+                                onmouseover="this.style.backgroundColor='${hoverBgColor}'"
+                                onmouseout="this.style.backgroundColor='${bgColor}'"
+                                class="flex items-center gap-1 text-white px-3 py-2 rounded-lg text-xs font-semibold transition duration-200 shadow-md whitespace-nowrap">
+                                <i data-lucide="${price === 0 ? 'download' : 'shopping-cart'}" class="w-4 h-4"></i>
+                                ${price === 0 ? 'Jugar' : 'Añadir'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+function renderGameSection(containerId, title, games) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (!games || games.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-8">
+                <p class="text-gray-500 text-lg">No hay Juegos que coincidan</p>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = `
+        <h2 class="text-3xl font-extrabold text-gray-900 mb-4">${title}</h2>
+
+        <div class="carousel-wrapper group">
+
+            <button class="carousel-btn left" onclick="scrollCarousel('${containerId}', -1)">
+                <i data-lucide="chevron-left"></i>
+            </button>
+
+            <div id="${containerId}-carousel" class="carousel-container">
+                ${games.map(createGameCardHtml).join('')}
+            </div>
+
+            <button class="carousel-btn right" onclick="scrollCarousel('${containerId}', 1)">
+                <i data-lucide="chevron-right"></i>
+            </button>
+
+        </div>
+    `;
+
+    safeCreateIcons();
+}
+
+
+
+        function buildPlatformFilter(products) {
+            const platformSet = new Set(products.map(p => (p.plataforma || '').trim()).filter(Boolean));
+            const platformFilter = document.getElementById('platform-filter');
+            if (!platformFilter) return;
+            const platforms = Array.from(platformSet).sort();
+            if (platforms.length === 0) {
+                platformFilter.innerHTML = '<p class="text-xs text-gray-500">Plataformas no disponibles</p>';
+                return;
+            }
+            platformFilter.innerHTML = platforms.map((plat, idx) => `
+                <label class="flex items-center text-gray-700 hover:text-saga-red cursor-pointer transition">
+                    <input type="checkbox" value="${plat}" id="plat-${idx}" class="platform-checkbox form-checkbox h-4 w-4 text-saga-red bg-white border-gray-300 rounded mr-3 focus:ring-saga-red">
+                    ${plat}
+                </label>
+            `).join('');
+            document.querySelectorAll('#platform-filter input.platform-checkbox').forEach(cb => cb.addEventListener('change', applyFilters));
+        }
+
+        function getNumericPriceRange() {
+            const minInput = document.getElementById('min-price-input');
+            const maxInput = document.getElementById('max-price-input');
+
+            const minRawEmpty = !(minInput && minInput.value !== '');
+            const maxRawEmpty = !(maxInput && maxInput.value !== '');
+
+            let minVal = (minInput && minInput.value !== '') ? parseFloat(minInput.value) : 0;
+            let maxVal = (maxInput && maxInput.value !== '') ? parseFloat(maxInput.value) : Infinity;
+
+            if (isNaN(minVal)) minVal = 0;
+            if (isNaN(maxVal)) maxVal = Infinity;
+            if (maxVal < minVal) maxVal = minVal;
+
+            return { minVal, maxVal, minRawEmpty, maxRawEmpty };
+        }
+
+        function applyFilters() {
+            const searchEl = document.querySelector('input[placeholder*="Buscar"]');
+            const searchTerm = (searchEl && searchEl.value) ? searchEl.value.toLowerCase().trim() : '';
+
+            const checkedPlatforms = Array.from(document.querySelectorAll('#platform-filter input[type="checkbox"]:checked')).map(i => i.value);
+
+            const { minVal, maxVal, minRawEmpty, maxRawEmpty } = getNumericPriceRange();
+
+            const noSearch = !searchTerm;
+            const noPlatformFilter = checkedPlatforms.length === 0;
+            const noPriceFilter = minRawEmpty && maxRawEmpty;
+            const noFiltersActive = noSearch && noPlatformFilter && noPriceFilter;
+
+            if (noFiltersActive) {
+                const recienLanzados = allProducts.filter(p => p.etiquetas && p.etiquetas.some(e => e.nombre.toLowerCase().includes('reciente') || e.nombre.toLowerCase().includes('lanzado')));
+                const populares = allProducts.filter(p => p.etiquetas && p.etiquetas.some(e => e.nombre.toLowerCase().includes('popular')));
+                const recomendados = allProducts.filter(p => p.etiquetas && p.etiquetas.some(e => e.nombre.toLowerCase().includes('oferta')));
+
+                renderGameSection('section-novedades', 'Juegos recién lanzados', recienLanzados.length > 0 ? recienLanzados : allProducts.slice(0, 8));
+                renderGameSection('section-lanzados', 'Juegos Populares', populares.length > 0 ? populares : allProducts.slice(8, 16));
+                renderGameSection('section-populares', 'Juegos Recomendados', recomendados.length > 0 ? recomendados : allProducts.slice(16, 24));
+                return;
+            }
+
+            currentFiltered = allProducts.filter(p => {
+                const price = parseFloat(p.precio) || 0;
+                if (price < minVal || price > maxVal) return false;
+                if (checkedPlatforms.length > 0 && (!p.plataforma || !checkedPlatforms.includes(p.plataforma))) return false;
+                if (searchTerm && !(p.nombre || '').toLowerCase().includes(searchTerm)) return false;
+                return true;
+            });
+
+            document.getElementById('section-novedades').innerHTML = '';
+            document.getElementById('section-lanzados').innerHTML = '';
+
+            let resultTitle = 'Resultados';
+            if (searchTerm) resultTitle += ` para "${searchTerm}"`;
+            if (checkedPlatforms.length > 0) resultTitle += ` - ${checkedPlatforms.join(', ')}`;
+            if (!minRawEmpty || !maxRawEmpty) {
+                const minText = !minRawEmpty ? `$${minVal}` : '$0';
+                const maxText = !maxRawEmpty ? `$${maxVal}` : '∞';
+                resultTitle += ` - Precio: ${minText} - ${maxText}`;
+            }
+
+            renderGameSection('section-populares', resultTitle + ` (${currentFiltered.length})`, currentFiltered);
+        }
+
+        function updatePriceDisplay() {
+            const minInput = document.getElementById('min-price-input');
+            const maxInput = document.getElementById('max-price-input');
+            const priceValueDisplay = document.getElementById('price-value');
+            if (!priceValueDisplay) return;
+            const min = (minInput && minInput.value !== '') ? parseFloat(minInput.value) : 0;
+            const maxDefined = (maxInput && maxInput.value !== '') ? parseFloat(maxInput.value) : null;
+            const maxText = (maxDefined !== null) ? `$${maxDefined}` : '$∞';
+            priceValueDisplay.textContent = `$${min} - ${maxText}`;
+        }
+
+        function debounce(fn, wait) {
+            let t;
+            return function (...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), wait); };
+        }
+
+        // Inicialización principal
+        fetch('/api/productos/')
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            })
+            .then(data => {
+                if (!data || !Array.isArray(data.productos)) {
+                    console.warn('api_productos returned unexpected shape', data);
+                    allProducts = [];
+                } else {
+                    allProducts = data.productos;
+                }
+                currentFiltered = [...allProducts];
+
+                buildPlatformFilter(allProducts);
+
+                const recienLanzados = allProducts.filter(p => p.etiquetas && p.etiquetas.some(e => e.nombre.toLowerCase().includes('reciente') || e.nombre.toLowerCase().includes('lanzado')));
+                const populares = allProducts.filter(p => p.etiquetas && p.etiquetas.some(e => e.nombre.toLowerCase().includes('popular')));
+                const recomendados = allProducts.filter(p => p.etiquetas && p.etiquetas.some(e => e.nombre.toLowerCase().includes('oferta')));
+
+                renderGameSection('section-novedades', 'Juegos recién lanzados', recienLanzados.length > 0 ? recienLanzados : allProducts.slice(0, 8));
+                renderGameSection('section-lanzados', 'Juegos Populares', populares.length > 0 ? populares : allProducts.slice(8, 16));
+                renderGameSection('section-populares', 'Juegos Recomendados', recomendados.length > 0 ? recomendados : allProducts.slice(16, 24));
+            })
+            .catch(err => {
+                console.error('Error cargando productos:', err);
+                alertMessage('Error cargando productos', 'error');
+            });
+
+        const searchInputs = document.querySelectorAll('input[placeholder*="Buscar"]');
+        const debouncedApply = debounce(applyFilters, 180);
+        searchInputs.forEach(input => input.addEventListener('input', debouncedApply));
+
+        const minInput = document.getElementById('min-price-input');
+        const maxInput = document.getElementById('max-price-input');
+        if (minInput) minInput.addEventListener('input', () => { updatePriceDisplay(); debouncedApply(); });
+        if (maxInput) maxInput.addEventListener('input', () => { updatePriceDisplay(); debouncedApply(); });
+
+        safeCreateIcons();
+    });
+</script>
+
+
+
+</head>
+<body class="bg-saga-light text-gray-800 font-sans flex flex-col min-h-screen">
+    
+    <!-- Contenedor de Alertas (Esquina superior derecha) -->
+    <div id="alert-container" class="fixed top-4 right-4 z-50 w-full max-w-xs pointer-events-none"></div>
+
+    <!-- 1. Header Fijo (Navegación Principal) -->
+<header class="sticky top-0 z-40 bg-card-light shadow-md border-b border-gray-200">
+    <div class="flex items-center justify-between py-[1.2%] px-[2%]">
+
+        <!-- Logo + Menú -->
+        <div class="flex items-center space-x-4">
+            <a href="{% url 'index' %}" class="inline-flex items-center -ml-3 lg:ml-0">
+                <img src="{% static 'core/img/saga-logo.png' %}" class="w-30 min-w-[60px] max-w-[90px] h-auto">
+            </a>
+
+            <!-- Botón menú móvil -->
+            <button onclick="toggleSidebar()" class="lg:hidden p-[1.5%] rounded-lg hover:bg-gray-100 transition">
+                <i data-lucide="menu" class="w-6 h-6 text-gray-800"></i>
+            </button>
+        </div>
+
+        <!-- Búsqueda Desktop -->
+        <div class="hidden lg:block w-[45%] mx-[3%]">
+            <div class="relative">
+                <input type="text" placeholder="Buscar juegos, géneros, plataformas..."
+                    class="w-full py-[1%] pl-10 pr-4 rounded-full bg-gray-100 text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-saga-red">
+                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"></i>
+            </div>
+        </div>
+
+        <!-- Iconos -->
+        <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-700 hidden sm:inline">
+                    Hola, <span class="font-semibold">{{ request.session.user_username|default:"Usuario" }}</span>
+                </span>
+            {% comment %} Usar request.session.user_id porque el login guarda el id en sesión (no Django auth) {% endcomment %}
+            {% if request.session.user_id %}
+                <!-- Usuario autenticado: carrito → pago, perfil → perfil_usuario (dropdown) -->
+                
+
+                
+                <a href="{% url 'pago' %}">
+                    <button id="cart-btn" aria-label="Carrito" class="relative p-2 rounded-full hover:bg-gray-100 focus:outline-none">
+                        <i data-lucide="shopping-cart" class="w-6 h-6 text-gray-700"></i>
+                        <span id="cart-count" class="absolute -top-1 -right-1 bg-saga-red text-white text-xs rounded-full px-1">0</span>
+                    </button>
+                </a>
+
+                <div class="relative" id="user-menu-root">
+                    <button id="user-btn" aria-haspopup="true" aria-expanded="false" class="p-2 rounded-full hover:bg-gray-100 focus:outline-none">
+                        <i data-lucide="user" class="w-6 h-6 text-gray-700"></i>
+                    </button>
+
+                    <div id="user-dropdown" class="hidden origin-top-right absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-xl shadow-lg z-50 ring-1 ring-black ring-opacity-5 overflow-hidden">
+                        <div class="px-4 py-3 text-sm font-semibold text-gray-800 border-b">
+                            {{ request.session.user_username|default:"Usuario" }}
+                        </div>
+
+<a href="{% url 'perfil_usuario' %}?tab=perfil" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+    <i data-lucide="user-cog" class="w-4 h-4 mr-3 text-gray-500"></i>
+    Perfil
+</a>
+
+            <a href="{% url 'perfil_usuario' %}?tab=metodos" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+                <i data-lucide="credit-card" class="w-4 h-4 mr-3 text-gray-500"></i>
+                Métodos de Pago
+            </a>
+
+            <a href="{% url 'perfil_usuario' %}?tab=seguridad" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+                <i data-lucide="shield" class="w-4 h-4 mr-3 text-gray-500"></i>
+                Seguridad
+            </a>
+
+            <a href="{% url 'perfil_usuario' %}?tab=historial" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+                <i data-lucide="list-check" class="w-4 h-4 mr-3 text-gray-500"></i>
+                Historial
+            </a>
+
+                        <div class="border-t border-gray-100"></div>
+
+                        <a href="{% url 'logout' %}" class="flex items-center px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition">
+                            <i data-lucide="log-out" class="w-4 h-4 mr-3 text-red-500"></i>
+                            Cerrar Sesión
+                        </a>
+                    </div>
+                </div>
+
+            {% else %}
+                <!-- No autenticado: llevar a login -->
+                
+                <a href="{% url 'login' %}" id="login-link" class="text-gray-700 hover:text-red-600 hover:underline transition-colors duration-150">
+                    Iniciar sesión
+                </a>
+                
+                <a href="{% url 'login' %}">
+                    <button id="cart-btn" aria-label="Carrito" class="relative p-2 rounded-full hover:bg-gray-100 focus:outline-none">
+                        <i data-lucide="shopping-cart" class="w-6 h-6 text-gray-700"></i>
+                    </button>
+                </a>
+
+                <a href="{% url 'login' %}">
+                    <button id="user-btn" aria-haspopup="true" aria-expanded="false" class="p-2 rounded-full hover:bg-gray-100 focus:outline-none">
+                        <i data-lucide="user" class="w-6 h-6 text-gray-700"></i>
+                    </button>
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Búsqueda móvil -->
+    <div class="lg:hidden px-[4%] pb-[2%]">
+        <div class="relative">
+            <input type="text" placeholder="Buscar juegos, géneros, plataformas..."
+                class="w-full py-[1.5%] pl-10 pr-4 rounded-full bg-gray-100 text-gray-700 placeholder-gray-400 focus:ring-saga-red">
+            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"></i>
+        </div>
+    </div>
+</header>
+
+
+
+    <!-- 2. Contenido Principal (Sidebar + Catálogo) -->
+<main class="flex flex-1 w-full mt-[1%]">
+        
+        <!-- Overlay para Sidebar en Mobile -->
+        <div id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black opacity-50 z-20 hidden lg:hidden"></div>
+        
+        <!-- 3. Sidebar de Filtros -->
+        <aside id="sidebar" 
+            class="fixed lg:sticky top-0 left-0 w-64 lg:top-20 h-full lg:h-auto bg-card-light lg:bg-transparent p-6 space-y-8 z-50 
+                   transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out 
+                   lg:border-r border-gray-200 flex-shrink-0 overflow-y-auto shadow-xl lg:shadow-none">
+            
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center justify-between">
+                Filtros
+                <button onclick="toggleSidebar()" class="lg:hidden text-gray-500 hover:text-saga-red transition">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </h2>
+
+            <!-- Filtro de Plataforma -->
+            <section class="space-y-3">
+                <h3 class="text-lg font-semibold text-gray-700 border-b border-gray-200 pb-2">Plataforma</h3>
+                <div id="platform-filter" class="space-y-2 text-sm">
+                    <label class="flex items-center text-gray-700 hover:text-saga-red cursor-pointer transition">
+                        <input type="checkbox" class="form-checkbox h-4 w-4 text-saga-red bg-white border-gray-300 rounded mr-3 focus:ring-saga-red"> Steam
+                    </label>
+                    <label class="flex items-center text-gray-700 hover:text-saga-red cursor-pointer transition">
+                        <input type="checkbox" class="form-checkbox h-4 w-4 text-saga-red bg-white border-gray-300 rounded mr-3 focus:ring-saga-red"> Play Station 5
+                    </label>
+                    <label class="flex items-center text-gray-700 hover:text-saga-red cursor-pointer transition">
+                        <input type="checkbox" class="form-checkbox h-4 w-4 text-saga-red bg-white border-gray-300 rounded mr-3 focus:ring-saga-red"> Xbox Series X
+                    </label>
+                    <label class="flex items-center text-gray-700 hover:text-saga-red cursor-pointer transition">
+                        <input type="checkbox" class="form-checkbox h-4 w-4 text-saga-red bg-white border-gray-300 rounded mr-3 focus:ring-saga-red"> Nintendo Switch 2
+                    </label>
+                </div>
+            </section>
+            
+            <!-- Filtro de Rango de Precio (solo entradas manuales) -->
+            <section class="space-y-3">
+                <h3 class="text-lg font-semibold text-gray-700 border-b border-gray-200 pb-2">Rango de Precio</h3>
+                <div class="pt-1 space-y-4">
+                    <!-- Entrada Manual Mínimo -->
+                    <div>
+                        <label for="min-price-input" class="text-xs font-medium text-gray-500 block mb-1">Mínimo</label>
+                        <input type="number" id="min-price-input" placeholder="0" min="0" step="0.01"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-saga-red bg-white">
+                    </div>
+
+                    <!-- Entrada Manual Máximo -->
+                    <div>
+                        <label for="max-price-input" class="text-xs font-medium text-gray-500 block mb-1">Máximo</label>
+                        <input type="number" id="max-price-input" placeholder="1000" min="0" step="0.01"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-saga-red bg-white">
+                    </div>
+                    
+                    <!-- Display del Rango Actual -->
+                    <div class="mt-4 text-center text-xl font-bold text-saga-red bg-gray-50 py-2 rounded-lg">
+                        <span id="price-value">$0 - $1000</span>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- (Se eliminó el botón "Aplicar Filtros") -->
+
+        </aside>
+
+        <!-- 4. Catálogo de Juegos (Contenido Principal) -->
+        <section class="flex-1 min-w-0 space-y-12 pb-12 content-container lg:ml-0 lg:pl-0">
+            
+            <!-- Sección: Novedades y Ofertas -->
+            <div id="section-novedades">
+                <!-- Contenido inyectado por JS -->
+            </div>
+            
+            <!-- Sección: Recién Lanzados -->
+            <div id="section-lanzados">
+                 <!-- Contenido inyectado por JS -->
+            </div>
+
+            <!-- Sección: Populares -->
+            <div id="section-populares">
+                 <!-- Contenido inyectado por JS -->
+            </div>
+
+        </section>
+
+
+
+
+    </main>
+<script>
+function scrollSlider(id, direction) {
+    const track = document.getElementById(`${id}-track`);
+    if (!track) return;
+
+    const cardWidth = 280; // card + gap
+    track.scrollBy({
+        left: direction * cardWidth,
+        behavior: "smooth"
+    });
+}
+</script>
+<script src="{% static 'core/js/perfil.js' %}"></script>
+</body>
+</html>

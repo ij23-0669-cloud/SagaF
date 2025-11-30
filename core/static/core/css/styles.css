@@ -1,0 +1,351 @@
+/* Estilos globales unificados para SAGA - tema claro coherente */
+
+:root{
+    --saga-red: #e33d37;
+    --saga-red-600: #c5322d; /* hover/oscuro */
+    --saga-dark: #111827;
+    --bg-page: #f7f7f7;
+    --card-bg: #ffffff;
+    --muted: #6b7280;
+    --success: #22c55e;
+    --radius: 0.75rem; /* 12px */
+    --shadow-soft: 0 6px 18px rgba(15,23,42,0.06);
+    --shadow-md: 0 8px 30px rgba(15,23,42,0.08);
+    --container-max: 1200px;
+}
+
+/* Tipografía */
+*{box-sizing:border-box}
+html,body{height:100%;}
+body{
+    margin:0;
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background:var(--bg-page);
+    color:var(--saga-dark);
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    line-height:1.4;
+}
+
+
+/* Contenedor global y utilidades de layout */
+.container, .main-content-area, .admin-layout, .content-container{
+    max-width:var(--container-max);
+    margin-left:auto;
+    margin-right:auto;
+    padding-left:1.5rem;
+    padding-right:1.5rem;
+}
+@media (min-width:1024px){
+    .container, .main-content-area, .admin-layout, .content-container{
+        padding-left:3rem;
+        padding-right:3rem;
+    }
+}
+
+/* Tarjetas y fondo consistente */
+.card{
+    background:var(--card-bg);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow-soft);
+    border:1px solid rgba(15,23,42,0.04);
+}
+
+/* Encabezados / Logo / Header */
+.header-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:1rem;
+    padding:0.75rem 0;
+}
+.header-center{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:1rem;
+}
+.logo{width:5.25rem;height:auto;} /* w-20 ~ 80px; use smaller if needed */
+.header-actions{display:flex;align-items:center;gap:0.5rem;}
+
+/* Botones */
+.btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:0.5rem;
+    padding:0.5rem 0.875rem;
+    border-radius:0.75rem;
+    font-weight:600;
+    cursor:pointer;
+    border:1px solid transparent;
+}
+.btn-primary{background:var(--saga-red);color:#fff;}
+.btn-primary:hover{background:var(--saga-red-600);}
+.btn-outline{background:transparent;color:var(--saga-dark);border-color:rgba(15,23,42,0.06);}
+.btn-danger{background:#fff;color:var(--saga-red);border:1px solid rgba(227,61,55,0.12);}
+.btn-disabled{
+    background: #e5e7eb;
+    color: #6b7280;
+    border: 1px solid rgba(15,23,42,0.04);
+    cursor: not-allowed;
+    box-shadow: none;
+    opacity: 1;
+}
+.badge{
+    display:inline-flex;align-items:center;justify-content:center;
+    min-width:1.25rem;height:1.25rem;padding:0 0.35rem;border-radius:999px;
+    font-size:0.675rem;font-weight:700;color:#fff;background:var(--saga-red);
+}
+
+/* Inputs y formularios */
+.input-style{
+    width:100%;
+    padding:0.75rem 1rem;
+    border-radius:0.5rem;
+    border:1px solid #e5e7eb;
+    background:#fff;
+    transition:box-shadow .15s, border-color .15s;
+    box-shadow:0 1px 2px rgba(0,0,0,0.03);
+}
+.input-style:focus{
+    outline:none;
+    border-color:var(--saga-red);
+    box-shadow:0 0 0 6px rgba(227,61,55,0.06);
+}
+
+/* Layouts repetidos */
+.main-content-area{padding:2rem 1rem;}
+@media(min-width:768px){ .main-content-area{padding:2rem 2rem;} }
+
+/* Formularios de añadir producto (grid adaptable) */
+.add-product-form-grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:1rem;
+}
+@media(min-width:768px){
+    .add-product-form-grid{grid-template-columns:repeat(4,minmax(0,1fr));}
+    .add-product-form-grid > .full{grid-column:1/-1;}
+}
+.save-button-container{display:flex;justify-content:flex-end;}
+
+/* Tab / nav styles */
+.nav-link{display:block;padding:0.6rem 0.75rem;border-left:4px solid transparent;font-weight:500;color:var(--muted);}
+.tab-active{background:var(--card-bg);color:var(--saga-red);border-left-color:var(--saga-red);font-weight:700;border-radius:0.5rem;}
+
+/* Listados / tablas / filas */
+.row{display:flex;align-items:center;gap:1rem;padding:0.75rem;border-radius:0.5rem;}
+.row:hover{background:rgba(227,61,55,0.03);cursor:pointer;}
+.table-scroll{overflow-x:auto;border-radius:0.5rem;}
+
+
+/* Modales */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:50;align-items:center;justify-content:center;}
+.modal-overlay.active{display:flex;}
+.modal{background:var(--card-bg);padding:1.25rem;border-radius:0.75rem;box-shadow:var(--shadow-md);max-width:32rem;width:100%;}
+
+/* Badge y carrito */
+.cart-badge{position:absolute;top:-6px;right:-6px;transform:translate(0,0);min-width:1.1rem;height:1.1rem;padding:0 0.3rem;border-radius:999px;background:var(--saga-red);color:#fff;font-size:0.675rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
+.cart-hidden{display:none;}
+
+/* Scrollbar estético (sólo webkit) */
+body::-webkit-scrollbar{width:8px;}
+body::-webkit-scrollbar-track{background:var(--bg-page);}
+body::-webkit-scrollbar-thumb{background:#c4c4c4;border-radius:999px;border:2px solid var(--bg-page);}
+
+/* Helpers y utilidades */
+.text-muted{color:var(--muted);}
+.text-saga-red{color:var(--saga-red);}
+.bg-card-light{background:var(--card-bg);}
+.rounded-lg{border-radius:0.75rem;}
+.shadow-soft{box-shadow:var(--shadow-soft);}
+.flex-center{display:flex;align-items:center;justify-content:center;}
+.w-clip{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* Pequeños ajustes específicos reusables */
+.key-display{word-break:break-all;user-select:all;}
+.sortable{cursor:pointer;user-select:none;}
+
+/* Evitar duplicados: dejar sólo declaraciones globales sobre body/font/color */
+
+
+    /*-- Estilos específicos de factura (forzar visibilidad/maquetado sin romper el resto) --*/
+
+/* Scoped invoice styles to avoid conflicts con styles.css */
+        #invoice-wrap {     max-width: 900px;
+                            width: 100%;
+                            margin: 2.25rem auto; }
+        #invoice-card {  width: 100%;
+                        height: auto; /* <-- ESTA ES LA CLAVE */
+                        min-height: fit-content; /* asegura que crezca con contenido */
+                        background: #fff; 
+                        border-radius: 1rem; padding: 1.25rem; 
+                        box-shadow: 0 10px 30px rgba(2,6,23,0.06); 
+                        border: 1px solid rgba(15,23,42,0.04); }
+
+        /* Forzar que el logo no sea ocultado por reglas globales */
+        .invoice-logo {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            width: 84px !important;
+            height: auto !important;
+            object-fit: contain !important;
+        }
+
+        /* Header layout */
+        #invoice-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; border-bottom:1px solid rgba(15,23,42,0.04); padding-bottom:1rem; margin-bottom:1rem; }
+        #invoice-title { flex:1; text-align:center; }
+        #invoice-meta { text-align:right; min-width:120px; }
+
+        /* Client / dates */
+        .invoice-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1.25rem; }
+        @media (max-width:640px) { .invoice-grid { grid-template-columns:1fr; } .invoice-title { text-align:left; } }
+
+        /* Table */
+        .invoice-table { width:100%; border-collapse:collapse; margin-bottom:1rem; }
+        .invoice-table th, .invoice-table td { padding:0.75rem 0.5rem; border-bottom:1px solid rgba(15,23,42,0.04); text-align:left; }
+        .invoice-table th { color:#374151; font-weight:600; font-size:0.875rem; }
+        .invoice-total-row td { font-weight:700; font-size:1.05rem; }
+
+        /* Small utilities */
+        .muted { color:#6b7280; }
+        .right { text-align:right; }
+
+/* Asegurar que el contenedor principal mantenga flujo normal y el botón quede dentro */
+.w-full.max-w-7xl {
+    position: relative; /* permite que elementos hijos se posicionen respecto a este bloque */
+    overflow: visible;  /* evita recortes inesperados */
+}
+
+/* Forzar que el botón de exportar esté en el flujo y visible */
+#export-pdf-btn {
+    position: relative !important;
+    z-index: 20;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Evitar que reglas globales oculten los botones o los fijen fuera */
+button[id$="pdf-btn"], button[id^="export"] {
+    position: relative !important;
+}
+
+
+/* ===== Carrusel tipo Eneba ===== */
+
+.carousel-wrapper {
+    position: relative;
+    width: 100%;
+    padding: 0.5rem 0 1rem;
+}
+
+/* Contenedor de tarjetas */
+
+
+
+/* ELIMINAR HOVER QUE MOSTRABA LA BARRA */
+/* (comentado o eliminado por completo) */
+
+/* Tarjeta de juego */
+
+
+
+
+.carousel-viewport {
+    padding-bottom: 0.5rem;
+    margin-bottom: -0.75rem;
+}
+
+
+/* ===== CARRUSEL ESTILO ENEBA — LIMPIO ===== */
+
+.carousel-wrapper {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    padding: 0.5rem 0;
+}
+
+.carousel-container {
+    display: flex;
+    gap: 1.25rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    padding: 0.25rem 0 1rem;
+    scrollbar-width: none;     /* Firefox */
+}
+
+.carousel-container::-webkit-scrollbar {
+    display: none !important;  /* Chrome / Safari */
+}
+
+/* ===== CARD ===== */
+.game-card {
+    flex: 0 0 260px;
+    scroll-snap-align: start;
+    background: #ffffff;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.game-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 15px 35px rgba(0,0,0,0.18);
+}
+
+.game-card img {
+    width: 100%;
+    height: 170px;
+    object-fit: cover;
+}
+
+/* ===== FLECHAS ===== */
+.carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.9);
+    backdrop-filter: blur(6px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.20);
+    opacity: 0;
+    transition: opacity .25s ease;
+    z-index: 20;
+}
+
+.carousel-wrapper:hover .carousel-btn {
+    opacity: 1;
+}
+
+.carousel-btn.left  { left: 0; }
+.carousel-btn.right { right: 0; }
+
+.scrollbar-hide::-webkit-scrollbar {
+    display: none !important;
+}
+
+.scrollbar-hide {
+    -ms-overflow-style: none !important; 
+    scrollbar-width: none !important;
+}
+
+.carousel-container {
+    overflow-x: scroll;
+    scrollbar-width: none !important;
+}
+
+.carousel-container::-webkit-scrollbar {
+    display: none !important;
+}

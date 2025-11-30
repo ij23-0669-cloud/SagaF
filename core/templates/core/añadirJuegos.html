@@ -1,0 +1,319 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo de Productos SAGA</title>
+    <!-- Carga de Tailwind CSS para el diseño -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carga de Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest" defer></script>
+    <link rel="stylesheet" href="{% static 'core/css/styles.css' %}">
+    <script>
+        // Configuración de colores personalizada de SAGA
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'saga-red': '#e53e3e',
+                        'saga-dark': '#1A202C',
+                        'saga-light-red': '#fef2f2',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 font-sans p-4 md:p-8">
+
+    <!-- Contenido Principal - Catálogo -->
+    <div class="admin-layout max-w-7xl mx-auto">
+        
+        <!-- Encabezado del Catálogo -->
+        <header class="mb-6 flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <a href="{% url 'panel_admin' %}">
+                    <button class="px-4 py-2 bg-[#e53e3e] hover:bg-red-700 text-white rounded-lg transition flex items-center gap-2 font-semibold">
+                        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                        Volver
+                    </button>
+                </a>
+                <img src="{% static 'core/img/saga-logo.png' %}" alt="SAGA" class="w-16 h-auto object-contain">
+                <h1 class="text-3xl font-bold text-saga-dark">
+                    Catálogo de Productos
+                </h1>
+            </div>
+
+            <!-- Botón ADMIN (simulación) -->
+            <span class="bg-saga-red text-white text-xs font-bold px-3 py-1 rounded-full uppercase">ADMIN</span>
+        </header>
+
+        <!-- Bloque para Añadir Nuevo Producto -->
+        <div class="bg-white p-6 rounded-xl shadow-lg mb-8 border-t-4 border-saga-red">
+            <h2 class="text-xl font-semibold text-saga-dark mb-4 flex items-center">
+                <i data-lucide="plus-circle" class="w-5 h-5 mr-3 text-saga-red"></i>
+                Añadir Nuevo Producto
+            </h2>
+
+            <form id="add-product-form" method="post" action="{% url 'anadir_juegos' %}" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <div class="text-red-600 text-sm mb-2">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <div class="space-y-4 md:col-span-1">
+                    <!-- hidden para codigo_producto (se rellenará por JS) -->
+                    <input type="hidden" id="game-code" name="codigo_producto" value="">
+
+                    <!-- Imagen URL (usamos el campo del form para garantizar name correcto) -->
+                    <label for="{{ form.imagen_url.id_for_label }}" class="block text-xs font-medium text-gray-700">URL de la imagen</label>
+                    {{ form.imagen_url }}
+                    {% if form.imagen_url.errors %}
+                        <p class="text-red-500 text-xs">{{ form.imagen_url.errors.0 }}</p>
+                    {% endif %}
+
+                    <div class="w-full mt-2">
+                        <div id="image-preview" class="w-40 h-28 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden">
+                            <img id="preview-img" src="" alt="Vista previa" class="object-contain w-full h-full hidden">
+                            <span id="preview-empty" class="text-xs text-gray-400">Sin imagen</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="md:col-span-2 grid grid-cols-1 gap-4">
+                    <div class="space-y-1">
+                        <label for="{{ form.nombre.id_for_label }}" class="block text-xs font-medium text-gray-700">Nombre del Producto</label>
+                        {{ form.nombre }}
+                        {% if form.nombre.errors %}<p class="text-red-500 text-xs">{{ form.nombre.errors.0 }}</p>{% endif %}
+                    </div>
+
+                    <div class="space-y-1">
+                        <label for="{{ form.id_categoria.id_for_label }}" class="block text-xs font-medium text-gray-700">Género / Categoría</label>
+                        {{ form.id_categoria }}
+                        {% if form.id_categoria.errors %}<p class="text-red-500 text-xs">{{ form.id_categoria.errors.0 }}</p>{% endif %}
+                    </div>
+
+                    <div class="space-y-1">
+                        <label for="{{ form.plataforma.id_for_label }}" class="block text-xs font-medium text-gray-700">Plataforma</label>
+                        {{ form.plataforma }}
+                        {% if form.plataforma.errors %}<p class="text-red-500 text-xs">{{ form.plataforma.errors.0 }}</p>{% endif %}
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label for="{{ form.precio.id_for_label }}" class="block text-xs font-medium text-gray-700">Precio Unitario ($)</label>
+                            {{ form.precio }}
+                            {% if form.precio.errors %}<p class="text-red-500 text-xs">{{ form.precio.errors.0 }}</p>{% endif %}
+                        </div>
+                        <div class="space-y-1">
+                            <label for="{{ form.stock.id_for_label }}" class="block text-xs font-medium text-gray-700">Stock</label>
+                            {{ form.stock }}
+                            {% if form.stock.errors %}<p class="text-red-500 text-xs">{{ form.stock.errors.0 }}</p>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="space-y-1">
+                        <label for="{{ form.desarrollador.id_for_label }}" class="block text-xs font-medium text-gray-700">Desarrollador</label>
+                        {{ form.desarrollador }}
+                        {% if form.desarrollador.errors %}<p class="text-red-500 text-xs">{{ form.desarrollador.errors.0 }}</p>{% endif %}
+                    </div>
+
+                    <div class="space-y-1">
+                        <label for="{{ form.descripcion.id_for_label }}" class="block text-xs font-medium text-gray-700">Descripción breve</label>
+                        {{ form.descripcion }}
+                        {% if form.descripcion.errors %}<p class="text-red-500 text-xs">{{ form.descripcion.errors.0 }}</p>{% endif %}
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button type="submit" class="bg-saga-red text-white py-3 px-6 rounded-xl font-semibold shadow-md hover:bg-red-700 transition duration-300 flex items-center">
+                            <i data-lucide="bookmark" class="w-5 h-5 mr-2"></i>
+                            Guardar Producto
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Mensajes de éxito/error -->
+        {% if messages %}
+            <div class="mb-6">
+                {% for message in messages %}
+                    <div class="p-4 rounded-xl {% if message.tags %}bg-{{ message.tags }}-50 text-{{ message.tags }}-800 border border-{{ message.tags }}-200{% else %}bg-blue-50 text-blue-800 border border-blue-200{% endif %}">
+                        <strong>{{ message }}</strong>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <!-- Catálogo Actual -->
+        <div class="bg-white rounded-xl shadow-lg overflow-x-auto p-6">
+            <h2 class="text-xl font-semibold text-saga-dark mb-4 flex items-center">
+                <i data-lucide="list" class="w-5 h-5 mr-3 text-saga-red"></i>
+                <span id="catalog-title">Catálogo Actual ({{ productos.count }} productos)</span>
+            </h2>
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NOMBRE DEL PRODUCTO</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">GÉNERO</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PLATAFORMA</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PRECIO UNITARIO</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STOCK</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ETIQUETA</th>
+                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">ACCIONES</th>
+                    </tr>
+                </thead>
+                <tbody id="product-list" class="bg-white divide-y divide-gray-200">
+                    {% if productos %}
+                        {% for producto in productos %}
+                            <tr class="hover:bg-gray-50 transition duration-100">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{{ producto.id_producto }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ producto.nombre }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ producto.id_categoria.nombre }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ producto.plataforma }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${{ producto.precio|floatformat:2 }}</td>
+                                
+                                <!-- STOCK con botones +/- -->
+                                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                    <form method="post" action="{% url 'anadir_juegos' %}" class="flex items-center gap-2">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="producto_id" value="{{ producto.id_producto }}">
+                                        <input type="hidden" name="action" value="update_stock">
+                                        
+                                        <button type="submit" name="stock_change" value="-1" 
+                                                class="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition text-xs font-bold"
+                                                {% if producto.stock <= 0 %}disabled class="bg-gray-300 cursor-not-allowed"{% endif %}>
+                                            −
+                                        </button>
+                                        
+                                        <span class="font-semibold text-gray-900 w-12 text-center">{{ producto.stock }}</span>
+                                        
+                                        <button type="submit" name="stock_change" value="1" 
+                                                class="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 transition text-xs font-bold">
+                                            +
+                                        </button>
+                                    </form>
+                                </td>
+
+                                <!-- ETIQUETAS -->
+                                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                    <form method="post" action="{% url 'anadir_juegos' %}" class="flex flex-col gap-2">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="producto_id" value="{{ producto.id_producto }}">
+                                        <input type="hidden" name="action" value="update_etiquetas">
+
+                                        <div class="flex flex-wrap gap-2">
+                                            {% for etiqueta in etiquetas %}
+                                                <label class="flex items-center gap-1">
+                                                    <input type="checkbox" name="etiqueta_id" value="{{ etiqueta.id_etiqueta }}" 
+                                                        {% if etiqueta in producto.etiquetas.all %}checked{% endif %}
+                                                        class="rounded border-gray-300">
+                                                    <span class="text-xs">{{ etiqueta.nombre }}</span>
+                                                </label>
+                                            {% endfor %}
+                                        </div>
+
+                                        <button type="submit" class="bg-saga-red text-white px-2 py-1 rounded text-xs hover:bg-red-700 transition w-fit">
+                                            Guardar
+                                        </button>
+                                    </form>
+                                </td>
+
+                                <!-- ELIMINAR -->
+                                <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                                    <a href="{% url 'eliminar_producto' producto.id_producto %}" 
+                                       class="text-red-600 hover:text-red-900 flex items-center justify-center" 
+                                       onclick="return confirm('¿Eliminar este producto?')">
+                                        <i data-lucide="trash-2" class="w-4 h-4 mr-1"></i>
+                                        Eliminar
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="8" class="px-6 py-4 text-center text-sm text-gray-500">
+                                No hay productos registrados aún.
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Contenedor de Feedback (oculto por defecto) -->
+        <div id="feedback-message" class="fixed top-5 right-5 p-4 rounded-xl shadow-xl z-50 transition-opacity duration-500 opacity-0 pointer-events-none"></div>
+
+    </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Inicializa Lucide icons UNA SOLA VEZ después de que el DOM esté listo
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+
+        // ===== Generador de código único =====
+        function generateCode(){
+            const d = new Date();
+            const datePart = String(d.getFullYear()).slice(2) + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+            const rnd = String(Math.floor(Math.random()*9000)+1000);
+            return 'GAME' + datePart + rnd;
+        }
+
+        // ===== Rellena el input hidden de código =====
+        const codeInput = document.querySelector('input[name="codigo_producto"]');
+        if (codeInput && !codeInput.value) {
+            codeInput.value = generateCode();
+        }
+
+        // ===== Preview de imagen =====
+        const previewImg = document.getElementById('preview-img');
+        const previewEmpty = document.getElementById('preview-empty');
+        const imagenField = document.querySelector('input[name="imagen_url"]');
+
+        function updatePreview(url){
+            if (!previewImg || !previewEmpty) return;
+            if (!url){ 
+                previewImg.src=''; 
+                previewImg.classList.add('hidden'); 
+                previewEmpty.classList.remove('hidden'); 
+                return; 
+            }
+            previewImg.onload = () => { 
+                previewImg.classList.remove('hidden'); 
+                previewEmpty.classList.add('hidden'); 
+            };
+            previewImg.onerror = () => { 
+                previewImg.classList.add('hidden'); 
+                previewEmpty.classList.remove('hidden'); 
+            };
+            previewImg.src = url;
+        }
+
+        if (imagenField){
+            imagenField.addEventListener('input', (e) => updatePreview(e.target.value));
+            if (imagenField.value) updatePreview(imagenField.value);
+        }
+
+        // ===== Submit: asegurar código antes de enviar =====
+        const form = document.getElementById('add-product-form');
+        if (form){
+            form.addEventListener('submit', function () {
+                if (codeInput && !codeInput.value) {
+                    codeInput.value = generateCode();
+                }
+            });
+        }
+    });
+</script>
+
+<script src="{% static 'core/js/scripts.js' %}"></script>
+
+</body>
+</html>

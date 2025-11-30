@@ -1,0 +1,165 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAGA - Perfil de Cliente</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="{% static 'core/css/styles.css' %}">
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-800 font-sans">
+
+    <div class="min-h-screen flex items-start justify-center p-4 md:p-8">
+        <div class="w-full max-w-6xl bg-white shadow-xl rounded-xl p-6 md:p-10">
+
+            <!-- Header -->
+            <header class="flex items-center justify-between mb-6 border-b pb-4">
+                <div class="flex items-center gap-3">
+                    <a href="{% url 'listado_clientes' %}">
+                        <button class="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition flex items-center gap-2">
+                            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                            Volver
+                        </button>
+                    </a>
+                    <img src="{% static 'core/img/saga-logo.png' %}" alt="SAGA" class="w-16 h-auto">
+                    <h1 class="text-3xl font-extrabold text-gray-800 flex items-center">
+                        <i data-lucide="user" class="w-6 h-6 text-[#e53e3e] mr-2"></i>
+                        Perfil de Cliente
+                    </h1>
+                </div>
+            </header>
+
+            <!-- Badge Cliente Frecuente -->
+            {% if es_frecuente %}
+            <div class="mb-6 bg-green-50 border-2 border-green-500 rounded-lg p-4 flex items-center justify-center gap-3">
+                <i data-lucide="check-circle" class="w-8 h-8 text-green-600"></i>
+                <div class="text-center">
+                    <p class="text-sm font-bold text-green-800 uppercase">Cliente Frecuente</p>
+                    <p class="text-xs text-green-700">Cliente desde: <span class="font-semibold">{{ fecha_registro }}</span></p>
+                </div>
+            </div>
+            {% else %}
+            <div class="mb-6 bg-gray-100 border-2 border-gray-300 rounded-lg p-4 flex items-center justify-center gap-3">
+                <i data-lucide="user" class="w-8 h-8 text-gray-500"></i>
+                <div class="text-center">
+                    <p class="text-sm font-bold text-gray-700 uppercase">Cliente Regular</p>
+                    <p class="text-xs text-gray-600">Cliente desde: <span class="font-semibold">{{ fecha_registro }}</span></p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Información del Cliente -->
+            <section class="mb-8 bg-gray-50 p-6 rounded-lg border border-gray-200">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                    <i data-lucide="user-circle" class="w-5 h-5 text-[#e53e3e] mr-2"></i>
+                    Datos Personales
+                </h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p class="text-gray-600 font-semibold">Nombre Completo:</p>
+                        <p class="text-gray-900 font-bold">{{ cliente.nombre }} {{ cliente.apellido }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600 font-semibold">Usuario:</p>
+                        <p class="text-gray-900">{{ cliente.usuario }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600 font-semibold">Correo Electrónico:</p>
+                        <p class="text-gray-900">{{ cliente.correo }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600 font-semibold">País:</p>
+                        <p class="text-gray-900">{{ cliente.get_pais_display|default:"N/A" }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600 font-semibold">Fecha de Nacimiento:</p>
+                        <p class="text-gray-900">{{ cliente.fecha_nacimiento|date:"d/m/Y"|default:"N/A" }}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600 font-semibold">Estado:</p>
+                        <span class="px-2 py-1 rounded text-xs font-semibold {% if cliente.estado == 'activo' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                            {{ cliente.estado|upper }}
+                        </span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Estadísticas -->
+            <section class="mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                    <i data-lucide="bar-chart-3" class="w-5 h-5 text-[#e53e3e] mr-2"></i>
+                    Estadísticas de Compra
+                </h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-blue-100 p-4 rounded-lg border-l-4 border-blue-500">
+                        <p class="text-xs uppercase font-semibold text-blue-800">Total de Compras</p>
+                        <p class="text-2xl font-extrabold text-blue-900">{{ num_compras }}</p>
+                    </div>
+                    <div class="bg-green-100 p-4 rounded-lg border-l-4 border-green-500">
+                        <p class="text-xs uppercase font-semibold text-green-800">Gasto Total</p>
+                        <p class="text-2xl font-extrabold text-green-900">${{ total_gasto|floatformat:2 }}</p>
+                    </div>
+                    <div class="bg-purple-100 p-4 rounded-lg border-l-4 border-purple-500">
+                        <p class="text-xs uppercase font-semibold text-purple-800">Método de Pago Principal</p>
+                        <p class="text-sm font-extrabold text-purple-900">
+                            {% if metodo_principal %}
+                                {{ metodo_principal.marca|default:"Tarjeta" }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Historial de Compras -->
+            <section>
+                <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                    <i data-lucide="shopping-bag" class="w-5 h-5 text-[#e53e3e] mr-2"></i>
+                    Historial de Compras
+                </h2>
+
+                {% if historial %}
+                    <div class="space-y-4">
+                        {% for compra in historial %}
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:shadow-lg transition">
+                            <div class="flex justify-between items-start mb-3">
+                                <div>
+                                    <p class="text-xs text-gray-500">Factura #{{ compra.id }}</p>
+                                    <p class="text-sm font-semibold text-gray-900">{{ compra.fecha }}</p>
+                                </div>
+                                <p class="text-lg font-bold text-[#e53e3e]">${{ compra.total|floatformat:2 }}</p>
+                            </div>
+
+                            <div class="border-t pt-3">
+                                <p class="text-xs font-semibold text-gray-600 mb-2">Productos:</p>
+                                <ul class="space-y-1 text-sm">
+                                    {% for producto in compra.productos %}
+                                    <li class="flex justify-between text-gray-700">
+                                        <span>{{ producto.nombre }} ({{ producto.plataforma }}) x{{ producto.cantidad }}</span>
+                                        <span class="font-semibold">${{ producto.subtotal|floatformat:2 }}</span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-center text-gray-500 py-8">Este cliente no ha realizado compras aún.</p>
+                {% endif %}
+            </section>
+
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+
+</body>
+</html>

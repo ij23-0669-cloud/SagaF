@@ -1,0 +1,108 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Factura - SAGA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{% static 'core/css/styles.css' %}">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>lucide.createIcons();</script>
+</head>
+<body class="bg-gray-50">
+    <main id="invoice-wrap" class="p-6 max-w-4xl mx-auto">
+        <section id="invoice-card" class="bg-white p-6 rounded-lg shadow-lg">
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-4">
+                    <a href="{% url 'index' %}" title="SAGA">
+                        <img src="{% static 'core/img/saga-logo.png' %}" alt="SAGA" class="w-36">
+                    </a>
+                </div>
+                <div class="text-right">
+                    <h1 class="text-xl font-extrabold text-gray-900">Factura Digital</h1>
+                    <p class="text-sm text-gray-500">Documento de venta electrónico</p>
+                    <p class="mt-2 text-sm text-gray-600">N.º <span class="font-semibold text-saga-red">{{ factura.id_factura }}</span></p>
+                    <p class="text-sm text-gray-600">Fecha: <span class="font-semibold">{{ factura.fecha }}</span></p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-6 mb-6">
+                <div>
+                    <p class="text-sm text-gray-500">Cliente / Emisor</p>
+                    <p class="font-semibold text-gray-900">{{ cliente_nombre }}</p>
+                    <p class="text-sm text-gray-700">{{ cliente_correo }}</p>
+                </div>
+
+                <div class="text-right">
+                    <p class="text-sm text-gray-500">Método de pago</p>
+                    <p class="font-semibold text-gray-900">{{ metodo_pago_display }}</p>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto mb-4">
+                <table class="w-full text-left">
+                    <thead class="text-sm text-gray-600 border-b">
+                        <tr>
+                            <th class="py-2">Artículo</th>
+                            <th class="py-2 text-right">Cantidad</th>
+                            <th class="py-2 text-right">Precio unit.</th>
+                            <th class="py-2 text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="items-body">
+                        {% for d in detalles %}
+                        <tr class="border-b">
+                            <td class="py-3">
+                                <div class="font-medium">{{ d.producto.nombre }}</div>
+                            </td>
+                            <td class="py-3 text-right">{{ d.cantidad }}</td>
+                            <td class="py-3 text-right">${{ d.precio_venta_unitario }}</td>
+                            <td class="py-3 text-right">${{ d.subtotal }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="py-4 text-center text-gray-500">No hay artículos.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="text-sm">
+                        <tr>
+                            <td colspan="3" class="text-right py-2 text-gray-600">Subtotal</td>
+                            <td class="text-right py-2">${{ subtotal }}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="3" class="text-right py-2 text-gray-600">Impuesto</td>
+                            <td class="text-right py-2">${{ impuesto }}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="3" class="text-right py-2 text-gray-600">Descuento</td>
+                            <td class="text-right py-2">-${{ descuento }}</td>
+                        </tr>
+                        <tr class="font-extrabold text-lg">
+                            <td colspan="3" class="text-right py-3">Total</td>
+                            <td class="text-right py-3 text-saga-red">${{ total }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="flex items-center justify-between mt-6">
+                <div class="text-sm text-gray-600">
+                    <p>Notas:</p>
+                    <p>Gracias por su compra. Contacto: soporte@saga.local</p>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button id="print-btn" class="px-4 py-2 border rounded hover:bg-gray-100 transition" onclick="window.print()">Imprimir</button>
+                    <a id="download-btn" href="#" class="px-4 py-2 bg-saga-red text-white rounded hover:bg-red-700 transition">Descargar PDF</a>
+                    <a href="{% url 'perfil_usuario' %}?tab=historial" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition flex items-center gap-2">
+                        <i data-lucide="package" class="w-4 h-4"></i>
+                        Ir a Inventario
+                    </a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+<script src="{% static 'core/js/scripts.js' %}"></script>
+</body>
+</html>

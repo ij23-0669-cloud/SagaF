@@ -1,0 +1,145 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Crear cuenta - SAGA</title>
+
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
+      theme: {
+        extend: {
+          colors: { 'saga-red': '#e53e3e', 'saga-dark': '#1A202C', 'saga-light-red': '#fef2f2' },
+          fontFamily: { sans: ['Inter','sans-serif'] }
+        }
+      }
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="{% static 'core/css/styles.css' %}">
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <div class="w-full max-w-lg p-4 sm:p-6 md:p-8 mx-auto">
+        <header class="text-center mb-6">
+            <div class="flex flex-col items-center gap-1">
+                <img src="{% static 'core/img/saga-logo.png' %}" alt="SAGA" class="w-36 h-auto object-contain">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800 -mt-1">Crea tu Cuenta</h1>
+                    <p class="text-sm text-gray-500 mt-0">Únete a la comunidad de gamers.</p>
+                </div>
+            </div>
+        </header>
+
+    {% if messages %}
+      <div class="space-y-2">
+        {% for message in messages %}
+          <div class="p-3 rounded {{ message.tags }} {% if message.level_tag == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-800{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <section class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-saga-red">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <label for="first-name" class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                <i data-lucide="user" class="w-4 h-4 mr-2 text-saga-red"></i>
+                Nombre
+            </label>
+            {{ form.nombre }}
+            {{ form.nombre.errors }}
+          </div>
+
+          <div>
+            <label for="last-name" class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                <i data-lucide="user-check" class="w-4 h-4 mr-2 text-saga-red"></i>
+                Apellido
+            </label>
+            {{ form.apellido }}
+            {{ form.apellido.errors }}
+          </div>
+
+          <div>
+            <label for="first-name" class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                <i data-lucide="user" class="w-4 h-4 mr-2 text-saga-red"></i>
+                Usuario
+            </label>           
+            {{ form.usuario }}
+            {{ form.usuario.errors }}
+          </div>
+
+          <div>
+            <label for="email" class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+              <i data-lucide="mail" class="w-4 h-4 mr-2 text-saga-red"></i>
+              Correo Electrónico
+            </label>
+            {{ form.correo }}
+            {{ form.correo.errors }}
+          </div>
+
+          <div>
+            <label for="password" class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+              <i data-lucide="lock" class="w-4 h-4 mr-2 text-saga-red"></i>
+              Contraseña
+            </label>
+            {{ form.contraseña }}
+            {{ form.contraseña.errors }}
+          </div>
+          
+          <div>
+            <label for="confirm-password" class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+              <i data-lucide="lock" class="w-4 h-4 mr-2 text-saga-red"></i>
+              Confirmar Contraseña
+            </label>
+            {{ form.confirmar_contraseña }}
+            {{ form.confirmar_contraseña.errors }}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+              <i data-lucide="calendar" class="w-4 h-4 mr-2 text-saga-red"></i>
+              Fecha de nacimiento
+            </label>
+              
+
+            {{ form.fecha_nacimiento }}
+            {{ form.fecha_nacimiento.errors }}
+          </div>
+
+          <div>
+            <label for="country" class="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+              <i data-lucide="globe" class="w-4 h-4 mr-2 text-saga-red"></i>
+              País
+            </label>
+            {{ form.pais }}
+            {{ form.pais.errors }}
+          </div>
+
+        </div>
+
+        <div class="mt-6 flex justify-end">
+          <button type="submit" 
+                  class="btn btn-primary w-full py-3 rounded-xl shadow-md transition duration-300">
+            <i data-lucide="log-in" class="w-5 h-5 mr-2"></i>
+            Crear Cuenta
+          </button>
+        </div>
+      </form>
+
+      <div class="px-6 text-center text-sm text-gray-600 mt-2">
+        ¿Ya tienes una cuenta? 
+        <a href="{% url 'login' %}" class="text-saga-red font-semibold hover:underline">Inicia Sesión aquí</a>
+      </div>
+    </section>
+  </div>
+
+  <script>if(window.lucide) lucide.replace();</script>
+  <script src="{% static 'core/js/crearCuenta.js' %}"></script>
+</body>
+</html>

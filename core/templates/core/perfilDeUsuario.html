@@ -1,0 +1,1238 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfil de Usuario - SAGA</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carga de Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="{% static 'core/css/styles.css' %}">
+    
+    <script>
+        // Configuración de Tailwind para usar la fuente Inter
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+
+        // --- DATOS DEL USUARIO DESDE DJANGO ---
+        let userData = {
+            id: "{{ user.id_usuario }}",
+            username: "{{ user.usuario }}",
+            name: "{{ user.nombre }}",
+            lastName: "{{ user.apellido }}",
+            email: "{{ user.correo }}",
+            birthdate: "{{ user.fecha_nacimiento|date:'Y-m-d' }}",
+            // country = código (value) almacenado en user.pais
+            country: "{{ user.pais }}",
+            // countryLabel = texto visible
+            countryLabel: "{{ user.get_pais_display }}",
+            rol: "{% if user.rol %}{{ user.rol.nombre }}{% else %}usuario{% endif %}",
+            estado: "{{ user.estado }}",
+            security: {
+                is2FAEnabled: false,
+                lastPasswordChange: '2024-01-01'
+            },
+            paymentMethods: [
+                { id: 'card_1', type: "Tarjeta de Crédito", brand: "Visa", last4: "9999", expiry: "99/99", isPrimary: true, mockId: 'X-30-X' },
+                { id: 'card_2', type: "Tarjeta de Débito", brand: "Mastercard", last4: "9999", expiry: "99/99", isPrimary: false, mockId: 'X-30-X' },
+            ],
+            purchaseHistory: [],
+        };
+
+        let currentActiveTab = 'personal';
+        let isEditing = false; 
+
+        // --- UTILIDADES GLOBALES ---
+        
+        /**
+         * Muestra mensajes de estado (éxito o error) temporalmente.
+         */
+        function showMessage(text, type = 'info') {
+            const messageBox = document.getElementById('message-box');
+            messageBox.textContent = text;
+            messageBox.className = 'fixed top-4 right-4 p-4 rounded-xl shadow-xl transition-all duration-300 transform translate-y-0 opacity-100 z-50';
+            
+            if (type === 'success') {
+                messageBox.classList.add('bg-green-500', 'text-white');
+            } else if (type === 'error') {
+                messageBox.classList.add('bg-red-500', 'text-white');
+            } else {
+                messageBox.classList.add('bg-blue-500', 'text-white');
+            }
+
+            setTimeout(() => {
+                messageBox.classList.add('translate-y-full', 'opacity-0');
+            }, 3000);
+            
+            setTimeout(() => {
+                messageBox.className = 'hidden';
+            }, 3500);
+        }
+
+        // --- LÓGICA DE EDICIÓN DE PERFIL ---
+        
+        /**
+         * Lógica para el botón de Cancelar. Reestablece los datos originales
+         * y vuelve al modo vista. (Fix de recursión)
+         */
+        function cancelEdit() {
+            // Resetear los datos a los valores originales
+            toggleEditMode(false);
+            loadUserData();
+            showMessage("Edición cancelada. Los cambios no guardados han sido descartados.", 'info');
+        }
+
+        function toggleEditMode(shouldEdit) {
+            isEditing = shouldEdit;
+            // incluir selects y textareas para que también se habiliten
+            const formFields = document.querySelectorAll('#personal-info-form input:not(#profile-email), #personal-info-form select, #personal-info-form textarea'); 
+            const editButton = document.getElementById('edit-button');
+            const saveButton = document.getElementById('save-button');
+            const cancelButton = document.getElementById('cancel-button');
+            
+            formFields.forEach(field => {
+                field.disabled = !isEditing;
+                field.classList.toggle('bg-gray-100', !isEditing);
+                field.classList.toggle('bg-white', isEditing);
+            });
+
+            if (isEditing) {
+                editButton.style.display = 'none';
+                saveButton.style.display = 'inline-flex';
+                cancelButton.style.display = 'inline-flex';
+            } else {
+                editButton.style.display = 'inline-flex';
+                saveButton.style.display = 'none';
+                cancelButton.style.display = 'none';
+            }
+        }
+
+        /**
+         * Carga los datos iniciales del usuario en el formulario.
+         */
+        function loadUserData() {
+            const el = id => document.getElementById(id);
+            el('profile-username') && (el('profile-username').value = userData.username);
+            el('profile-name') && (el('profile-name').value = userData.name);
+            el('profile-lastName') && (el('profile-lastName').value = userData.lastName);
+            el('profile-email') && (el('profile-email').value = userData.email);
+            el('profile-birthdate') && (el('profile-birthdate').value = userData.birthdate);
+
+            // profile-country es un <select>, userData.country es el código (value)
+            const countrySelect = el('profile-country');
+            if (countrySelect) {
+                countrySelect.value = userData.country || '';
+            }
+
+            el('user-id-display') && (el('user-id-display').textContent = userData.id);
+            el('header-username') && (el('header-username').textContent = userData.username);
+            el('current-username') && (el('current-username').textContent = userData.username);
+
+            // mostrar etiqueta legible del país
+            const countryDisplay = el('user-country-display');
+            if (countryDisplay) {
+                countryDisplay.textContent = userData.countryLabel || (countrySelect ? countrySelect.options[countrySelect.selectedIndex]?.text : '');
+            }
+        }
+
+        /**
+         * Guarda los cambios del perfil en la BD mediante AJAX
+         */
+        function saveProfile(event) {
+            event.preventDefault();
+
+            const el = id => document.getElementById(id);
+            const newUsername = el('profile-username')?.value.trim() || '';
+            const newName = el('profile-name')?.value.trim() || '';
+            const newLastName = el('profile-lastName')?.value.trim() || '';
+            const newBirthdate = el('profile-birthdate')?.value || '';
+            const newCountry = el('profile-country')?.value || '';
+
+            if (!newName || !newLastName || !newUsername) {
+                showMessage("Por favor, rellena al menos el Nombre, Apellido y Nombre de Usuario.", 'error');
+                return;
+            }
+
+            const saveButton = el('save-button');
+            if (saveButton) {
+                saveButton.textContent = 'Guardando...';
+                saveButton.disabled = true;
+            }
+
+            const formData = new FormData();
+            formData.append('nombre', newName);
+            formData.append('apellido', newLastName);
+            formData.append('usuario', newUsername);
+            formData.append('fecha_nacimiento', newBirthdate);
+            formData.append('pais', newCountry);
+
+            fetch('{% url "actualizar_perfil" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken')
+                },
+                body: formData,
+                credentials: 'same-origin'
+            })
+            .then(response => {
+                if (response.ok) return response.json().catch(() => ({ __no_json: true }));
+                return response.json().catch(() => response.text().then(t => { throw new Error(t || `HTTP ${response.status}`); }));
+            })
+            .then(data => {
+                // Siempre intentar salir del modo edición si el backend aplicó el cambio
+                if (data && data.__no_json) {
+                    // Éxito sin JSON
+                    userData.username = newUsername;
+                    userData.name = newName;
+                    userData.lastName = newLastName;
+                    userData.birthdate = newBirthdate;
+                    userData.country = newCountry;
+
+                    const countrySelectUpdate = el('profile-country');
+                    if (countrySelectUpdate) countrySelectUpdate.value = userData.country || '';
+                    el('user-country-display') && (el('user-country-display').textContent = countrySelectUpdate?.options[countrySelectUpdate.selectedIndex]?.text || '');
+                    el('current-username') && (el('current-username').textContent = userData.username);
+                    el('header-username') && (el('header-username').textContent = userData.username);
+
+                    showMessage('¡Perfil actualizado con éxito!', 'success');
+                    toggleEditMode(false);
+                    return;
+                }
+
+                if (data && data.success) {
+                    userData.username = data.user.username;
+                    userData.name = data.user.nombre;
+                    userData.lastName = data.user.apellido;
+                    userData.birthdate = data.user.fecha_nacimiento;
+                    userData.countryLabel = data.user.pais || '';
+                    userData.country = data.user.pais_value || userData.country;
+
+                    const countrySelectUpdate = el('profile-country');
+                    if (countrySelectUpdate) countrySelectUpdate.value = userData.country || '';
+                    el('user-country-display') && (el('user-country-display').textContent = userData.countryLabel || '');
+                    el('current-username') && (el('current-username').textContent = data.user.username);
+                    el('header-username') && (el('header-username').textContent = data.user.username);
+
+                    showMessage(data.message || '¡Perfil actualizado con éxito!', 'success');
+                    toggleEditMode(false);
+                } else {
+                    const msg = (data && data.message) ? data.message : 'No se guardaron los cambios.';
+                    showMessage(msg, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error al guardar perfil:', error);
+                // salir del modo edición para evitar bloqueo visual si el cambio se aplicó
+                toggleEditMode(false);
+                showMessage(error.message || 'Error al guardar el perfil. Intenta de nuevo.', 'error');
+            })
+            .finally(() => {
+                if (saveButton) {
+                    saveButton.textContent = 'Guardar Cambios';
+                    saveButton.disabled = false;
+                }
+            });
+        }
+
+        /**
+         * Obtiene el token CSRF de las cookies
+         */
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // --- LÓGICA DE MÉTODOS DE PAGO ---
+        
+        function mockAddPaymentMethod() {
+            if (userData.paymentMethods.length >= 4) {
+                showMessage("Límite de 4 métodos de pago alcanzado.", 'error');
+                return;
+            }
+            userData.paymentMethods.push({
+                id: `card_${Date.now()}`, 
+                type: "Tarjeta de Crédito", 
+                brand: "Amex", 
+                last4: "3000", 
+                expiry: "01/27",
+                isPrimary: false,
+                mockId: 'A--99--A'
+            });
+            showMessage("Tarjeta Amex **** 3000 añadida con éxito.", 'success');
+            switchTab('payment'); 
+        }
+
+        function mockDeletePaymentMethod(cardId, cardName) {
+            if (userData.paymentMethods.length === 1 && userData.paymentMethods.find(m => m.id === cardId).isPrimary) {
+                 showMessage("No puedes eliminar el único método de pago principal.", 'error');
+                 return;
+            }
+            
+            const wasPrimary = userData.paymentMethods.find(m => m.id === cardId).isPrimary;
+            
+            userData.paymentMethods = userData.paymentMethods.filter(m => m.id !== cardId);
+
+            if (wasPrimary && userData.paymentMethods.length > 0) {
+                userData.paymentMethods[0].isPrimary = true;
+                showMessage("Se eliminó el método principal. Se asignó una nueva tarjeta principal.", 'info');
+            }
+
+            showMessage(`Método de pago ${cardName} eliminado.`, 'error');
+            switchTab('payment'); 
+        }
+        
+        function setPrimary(cardId, cardName) {
+            userData.paymentMethods.forEach(method => {
+                method.isPrimary = (method.id === cardId);
+            });
+            showMessage(`¡${cardName} es ahora tu método de pago principal!`, 'success');
+            switchTab('payment');
+        }
+
+        /**
+         * Carga métodos de pago desde BD y renderiza.
+         */
+        function loadPaymentMethods() {
+            fetch('/api/payment-methods/')
+                .then(r => r.json())
+                .then(json => {
+                    if (json.ok) {
+                        userData.paymentMethods = json.items;
+                        
+                    } else {
+                        showMessage('Error cargando métodos de pago', 'error');
+                    }
+                })
+                .catch(err => { console.error(err); showMessage('Error de red', 'error'); });
+        }
+
+        function renderPaymentMethods() {
+            const methods = userData.paymentMethods || [];
+
+            let html = `
+                <div class="flex justify-between items-center mb-6 border-b pb-2">
+                    <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                        <i data-lucide="credit-card" class="w-6 h-6 mr-2 text-saga-red"></i>
+                        Métodos de Pago
+                    </h2>
+                    <button onclick="openStripeModal()" class="flex items-center px-4 py-2 text-white font-semibold bg-[#e33d37] hover:bg-[#c5322d] rounded-xl transition shadow-md">
+                        <i data-lucide="plus-circle" class="w-5 h-5 mr-2"></i>
+                        Añadir Nueva Tarjeta
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 mb-6">Tu Perfil de Pagos.</p>
+
+                <div class="space-y-4">
+            `;
+
+            if (methods.length === 0) {
+                html += `
+                    <div class="p-6 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-xl flex items-center">
+                        <i data-lucide="alert-triangle" class="w-6 h-6 mr-3 flex-shrink-0"></i>
+                        <p class="font-medium">Aún no tienes métodos de pago registrados. Añade uno para agilizar tus compras.</p>
+                    </div>
+                `;
+            } else {
+                methods.forEach(method => {
+                    const isPrimary = method.es_principal;
+                    const cardBg = isPrimary ? 'bg-white border border-gray-200 shadow-xl' : 'bg-gray-50 border border-gray-200 shadow';
+
+                    html += `
+                        <div class="p-6 rounded-xl flex items-center justify-between transition duration-200 ${cardBg}">
+                            <div class="flex items-start">
+                                <i data-lucide="wallet" class="w-7 h-7 mr-4 mt-1 flex-shrink-0 text-saga-red"></i>
+                                <div>
+                                    <p class="font-bold text-lg leading-snug text-gray-900">${method.marca}</p>
+                                    <p class="text-sm mt-1 font-medium text-gray-600">**** ${method.ultimos_4}</p>
+                                    <p class="text-xs text-gray-500 opacity-80">Vence: ${method.vencimiento}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="flex space-x-2 items-center flex-shrink-0">
+                                ${isPrimary ? '<span class="px-3 py-1 text-xs font-bold rounded-full bg-yellow-100 text-yellow-700 shadow-inner mr-2">Principal</span>' : ''}
+                                
+                                <button 
+                                    onclick="setPrimaryPaymentMethod(${method.id_metodo}, '${method.marca} **** ${method.ultimos_4}')" 
+                                    class="p-2 transition rounded-full ${isPrimary ? 'text-yellow-400 cursor-default' : 'text-gray-400 hover:text-yellow-400 hover:bg-gray-100/30'}" 
+                                    ${isPrimary ? 'disabled' : ''}
+                                >
+                                    <i data-lucide="star" class="w-5 h-5 ${isPrimary ? 'fill-yellow-300' : ''}"></i>
+                                </button>
+                                
+                                <button 
+                                    onclick="deletePaymentMethod(${method.id_metodo}, '${method.marca} **** ${method.ultimos_4}')" 
+                                    class="p-2 transition rounded-full text-gray-400 hover:text-red-600 hover:bg-gray-100/30"
+                                >
+                                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            html += `</div>`;
+            return html;
+        }
+
+        function deletePaymentMethod(metodoId, cardName) {
+            if (!confirm(`¿Eliminar ${cardName}?`)) return;
+
+            const csrftoken = getCookie('csrftoken');
+            fetch('/api/payment-methods/delete/', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({ id_metodo: metodoId })
+            })
+            .then(r => r.json())
+            .then(json => {
+                if (json.ok) {
+                    showMessage('Tarjeta eliminada', 'success');
+                    loadPaymentMethods();
+                } else {
+                    showMessage('Error eliminando tarjeta', 'error');
+                }
+            })
+            .catch(err => { console.error(err); showMessage('Error de red', 'error'); });
+        }
+
+        function setPrimaryPaymentMethod(metodoId, cardName) {
+            const csrftoken = getCookie('csrftoken');
+            fetch('/api/payment-methods/primary/', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({ id_metodo: metodoId })
+            })
+            .then(r => r.json())
+            .then(json => {
+                if (json.ok) {
+                    showMessage(json.message, 'success');
+                    loadPaymentMethods();
+                } else {
+                    showMessage('Error', 'error');
+                }
+            })
+            .catch(err => { console.error(err); showMessage('Error de red', 'error'); });
+        }
+
+        function openStripeModal() {
+            document.getElementById('stripe-modal').classList.remove('hidden');
+            document.getElementById('stripe-modal').classList.add('flex');
+        }
+
+        function closeStripeModal() {
+            document.getElementById('stripe-modal').classList.add('hidden');
+            document.getElementById('stripe-modal').classList.remove('flex');
+        }
+
+        // --- LÓGICA DE HISTORIAL DE COMPRAS ---
+
+        /**
+         * Carga el historial de compras desde la BD.
+         */
+        function loadPurchaseHistory() {
+            fetch('/api/purchase-history/')
+                .then(r => r.json())
+                .then(json => {
+                    if (json.ok) {
+                        userData.purchaseHistory = json.items || [];
+                        // YA NO CAMBIAMOS DE PESTAÑA AQUÍ
+                    } else {
+                        showMessage('Error cargando historial', 'error');
+                    }
+                })
+                .catch(err => { 
+                    console.error(err); 
+                    showMessage('Error de red', 'error'); 
+                });
+        }
+
+
+        /**
+         * Renderiza la tabla de historial de compras con datos reales.
+         */
+        function renderPurchaseHistory() {
+            const history = userData.purchaseHistory || [];
+
+            let html = `
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 border-b pb-2 flex items-center">
+                    <i data-lucide="history" class="w-6 h-6 mr-2 text-saga-red"></i>
+                    Historial de Compras y Claves
+                </h2>
+                <p class="text-gray-600 mb-6">Tu lista de transacciones realizadas. Cada producto se muestra por separado con sus claves específicas.</p>
+
+                <div class="overflow-x-auto rounded-xl shadow-lg border border-gray-200">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Factura</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plataforma</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Subtotal</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Claves</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+        `;
+
+        if (history.length === 0) {
+            html += `
+                        <tr>
+                            <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                                <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 text-gray-400"></i>
+                                <p>Aún no tienes compras registradas.</p>
+                            </td>
+                        </tr>
+            `;
+        } else {
+            history.forEach((item, index) => {
+                const hasKeys = item.keys && item.keys.length > 0;
+                const keyDisplay = hasKeys ? `Ver ${item.keys.length} clave${item.keys.length > 1 ? 's' : ''}` : 'Sin clave';
+                const buttonClass = hasKeys 
+                    ? 'bg-[#e53e3e] hover:bg-red-700 text-white' 
+                    : 'bg-gray-300 text-gray-600 cursor-not-allowed';
+                
+                // Extraer solo la fecha (sin hora)
+                const dateOnly = item.date.split(' ')[0];
+                
+                html += `
+                        <tr class="hover:bg-gray-50 transition duration-150">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                ${item.id}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${dateOnly}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${item.item}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.platform}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-right text-gray-900">$${item.amount.toFixed(2)}</td>
+                            
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                <button 
+                                    type="button"
+                                    data-item-index="${index}"
+                                    class="view-key-btn px-4 py-2 text-sm font-bold rounded-lg transition shadow-md ${buttonClass}"
+                                    ${!hasKeys ? 'disabled' : ''}
+                                >
+                                    ${keyDisplay}
+                                </button>
+                            </td>
+                        </tr>
+                `;
+            });
+        }
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        return html;
+    }
+
+        /**
+         * Attach listeners a los botones "Ver Clave" del historial.
+         */
+        function attachKeyButtonListeners() {
+            const placeholder = document.getElementById('placeholder-content');
+            if (!placeholder) return;
+
+            placeholder.addEventListener('click', (e) => {
+                const btn = e.target.closest('.view-key-btn');
+                if (!btn) return;
+
+                const index = parseInt(btn.dataset.itemIndex);
+                const item = userData.purchaseHistory[index];
+                
+                if (item && item.keys && item.keys.length > 0) {
+                    showKeyModal(item.item, item.keys);
+                }
+            });
+        }
+
+        // --- LÓGICA DE SEGURIDAD ---
+        
+        /**
+         * Renderiza la interfaz de la pestaña Seguridad.
+         */
+        function renderSecurity() {
+            const is2FA = userData.security.is2FAEnabled;
+            const toggleColor = is2FA ? 'bg-green-600' : 'bg-gray-200';
+            const toggleTranslate = is2FA ? 'translate-x-6' : 'translate-x-1';
+            const toggleText = is2FA ? 'Activada' : 'Desactivada';
+            const toggleIcon = is2FA ? 'lock' : 'unlock';
+            const toggleStyle = is2FA ? 'text-green-700' : 'text-yellow-700';
+            const toggleBg = is2FA ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200';
+
+            return `
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 border-b pb-2 flex items-center">
+                    <i data-lucide="shield" class="w-6 h-6 mr-2 text-saga-red"></i>
+                    Seguridad y Acceso
+                </h2>
+                
+                <!-- Sección de Autenticación de Dos Factores (2FA) -->
+                <div class="mb-8 p-6 ${toggleBg} rounded-xl border-2">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-900 flex items-center mb-1">
+                                Autenticación de Dos Factores (2FA)
+                            </h3>
+                            <p class="text-sm text-gray-700">
+                                Añade una capa de seguridad requiriendo un código de tu móvil además de tu contraseña.
+                            </p>
+                        </div>
+                        
+                        <!-- Toggle Switch -->
+                        <div class="flex items-center space-x-3 flex-shrink-0">
+                            <span class="text-sm font-medium ${toggleStyle}">${toggleText}</span>
+                            <button 
+                                onclick="toggle2FA()"
+                                class="relative inline-flex h-7 w-12 items-center rounded-full ${toggleColor} transition-colors focus:outline-none focus:ring-4 focus:ring-red-300"
+                            >
+                                <span class="sr-only">Toggle 2FA</span>
+                                <span 
+                                    class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md ${toggleTranslate}"
+                                >
+                                    <i data-lucide="${toggleIcon}" class="w-4 h-4 m-0.5 text-gray-500"></i>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sección de Cambio de Contraseña -->
+                <div class="p-6 bg-white rounded-xl shadow-inner border border-gray-100">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4 border-b pb-2 flex items-center">
+                        <i data-lucide="key" class="w-5 h-5 mr-2 text-saga-red"></i>
+                        Cambiar Contraseña
+                    </h3>
+                    <p class="text-sm text-gray-500 mb-4">Último cambio de contraseña: ${userData.security.lastPasswordChange}</p>
+
+                    <form id="password-form" onsubmit="changePassword(event)" class="space-y-4 max-w-md">
+                        <div>
+                            <label for="current-password" class="block text-sm font-medium text-gray-700 mb-2">Contraseña Actual</label>
+                            <input type="password" id="current-password" class="input-style w-full" required>
+                        </div>
+                        <div>
+                            <label for="new-password" class="block text-sm font-medium text-gray-700 mb-2">Nueva Contraseña</label>
+                            <input type="password" id="new-password" class="input-style w-full" required>
+                        </div>
+                        <div>
+                            <label for="confirm-password" class="block text-sm font-medium text-gray-700 mb-2">Confirmar Nueva Contraseña</label>
+                            <input type="password" id="confirm-password" class="input-style w-full" required>
+                        </div>
+                        
+                        <div class="pt-2">
+                            <button
+                                type="submit"
+                                id="change-password-button"
+                                class="flex items-center px-4 py-2 text-white font-bold bg-[#e33d37] rounded-xl hover:bg-[#c5322d] transition shadow-lg w-full justify-center"
+                            >
+                                <i data-lucide="lock-open" class="w-5 h-5 mr-2"></i>
+                                Actualizar Contraseña
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+        }
+
+        /**
+         * Simula el cambio de contraseña.
+         */
+        function changePassword(event) {
+            event.preventDefault();
+            const current = document.getElementById('current-password').value;
+            const newPass = document.getElementById('new-password').value;
+            const confirmPass = document.getElementById('confirm-password').value;
+            const btn = document.getElementById('change-password-button');
+
+            if (!current || !newPass || !confirmPass) {
+                showMessage("Completa todos los campos.", 'error');
+                return;
+            }
+            if (newPass !== confirmPass) {
+                showMessage("La nueva contraseña y la confirmación no coinciden.", 'error');
+                return;
+            }
+            if (newPass.length < 8) {
+                showMessage("La nueva contraseña debe tener al menos 8 caracteres.", 'error');
+                return;
+            }
+
+            btn.textContent = 'Procesando...';
+            btn.disabled = true;
+
+            const csrftoken = getCookie('csrftoken');
+            fetch('{% url "api_change_password" %}', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                },
+                body: JSON.stringify({
+                    current_password: current,
+                    new_password: newPass,
+                    confirm_password: confirmPass
+                })
+            })
+            .then(res => res.json().catch(() => ({})))
+            .then(data => {
+                if (data.ok) {
+                    showMessage(data.message || '¡Contraseña actualizada con éxito!', 'success');
+                    document.getElementById('password-form').reset();
+                    userData.security.lastPasswordChange = new Date().toISOString().slice(0, 10);
+                    switchTab('security');
+                } else {
+                    const errorMap = {
+                        not_authenticated: 'Debes iniciar sesión.',
+                        missing_fields: 'Completa todos los campos.',
+                        password_mismatch: 'Las contraseñas no coinciden.',
+                        password_too_short: 'La nueva contraseña es demasiado corta.',
+                        invalid_current_password: 'La contraseña actual es incorrecta.'
+                    };
+                    showMessage(errorMap[data.error] || data.error || 'Error al cambiar la contraseña.', 'error');
+                }
+            })
+            .catch(() => {
+                showMessage('Error de red al cambiar la contraseña.', 'error');
+            })
+            .finally(() => {
+                btn.textContent = 'Actualizar Contraseña';
+                btn.disabled = false;
+            });
+        }
+
+        /**
+         * Simula la activación/desactivación de 2FA.
+         */
+        function toggle2FA() {
+            userData.security.is2FAEnabled = !userData.security.is2FAEnabled;
+            
+            const action = userData.security.is2FAEnabled ? 'activada' : 'desactivada';
+            const message = userData.security.is2FAEnabled ? 'Autenticación de Dos Factores **activada**. ¡Tu cuenta es más segura!' : 'Autenticación de Dos Factores **desactivada**. Tu cuenta es menos segura.';
+            const type = userData.security.is2FAEnabled ? 'success' : 'error';
+            
+            showMessage(message, type);
+            switchTab('security'); // Recargar para actualizar el toggle
+        }
+
+
+        // --- LÓGICA DEL MODAL DE CLAVE ---
+        
+        /**
+         * Muestra el modal con la clave del producto.
+         * @param {string} productName - Nombre del producto.
+         * @param {string} productKey - Clave de activación del producto.
+         */
+        function showKeyModal(productName, keys) {
+            const modal = document.getElementById('key-modal');
+            if (!modal) return;
+
+            // cancelar cualquier temporizador previo
+            if (modal._autoCloseTimer) {
+                clearTimeout(modal._autoCloseTimer);
+                modal._autoCloseTimer = null;
+            }
+
+            // convertir productKey string a array si es necesario
+            let keysArray = Array.isArray(keys) ? keys : [keys];
+
+            // contenido de claves
+            const list = modal.querySelector('.modal-keys');
+            if (list) {
+                list.innerHTML = keysArray.map(k => `
+                    <div class="key-row flex items-center justify-between gap-2 py-3 px-4 bg-gray-50 rounded-lg mb-2">
+                        <code class="font-mono bg-white px-3 py-2 rounded text-sm break-all flex-1 border border-gray-200">${k}</code>
+                        <button type="button" class="copy-key-btn px-3 py-2 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700 transition" data-key="${k}">
+                            Copiar
+                        </button>
+                    </div>
+                `).join('');
+
+                // listeners para copiar
+                modal.querySelectorAll('.copy-key-btn').forEach(btn => {
+                    btn.onclick = function (e) {
+                        e.preventDefault();
+                        const key = this.dataset.key;
+                        if (!key) return;
+                        navigator.clipboard?.writeText(key).then(() => {
+                            showMessage('Clave copiada al portapapeles ✓', 'success');
+                            const originalText = this.textContent;
+                            this.textContent = '¡Copiado!';
+                            this.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                            this.classList.add('bg-green-600', 'hover:bg-green-700');
+                            setTimeout(() => {
+                                this.textContent = originalText;
+                                this.classList.remove('bg-green-600', 'hover:bg-green-700');
+                                this.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                            }, 1200);
+                        }).catch(() => showMessage('No se pudo copiar', 'error'));
+                    };
+                });
+            }
+
+            // título
+            const titleEl = modal.querySelector('.modal-title');
+            if (titleEl) titleEl.textContent = productName || 'Clave de Producto';
+
+            // mostrar modal
+            modal.classList.remove('hidden');
+            modal.setAttribute('aria-hidden', 'false');
+            
+            // foco
+            const firstCopy = modal.querySelector('.copy-key-btn');
+            if (firstCopy) firstCopy.focus();
+
+            // listeners delegados (una sola vez)
+            modal.removeEventListener('click', _modalClickHandler);
+            modal.addEventListener('click', _modalClickHandler);
+
+            document.removeEventListener('keydown', _escKeyHandler);
+            document.addEventListener('keydown', _escKeyHandler);
+        }
+
+        function hideKeyModal() {
+            const modal = document.getElementById('key-modal');
+            if (!modal) return;
+
+            modal.removeEventListener('click', _modalClickHandler);
+            document.removeEventListener('keydown', _escKeyHandler);
+
+            modal.classList.add('hidden');
+            modal.setAttribute('aria-hidden', 'true');
+
+            if (modal._autoCloseTimer) {
+                clearTimeout(modal._autoCloseTimer);
+                modal._autoCloseTimer = null;
+            }
+        }
+
+        /* handlers auxiliares */
+        function _modalClickHandler(e) {
+            const modal = document.getElementById('key-modal');
+            const backdrop = modal.querySelector('.modal-backdrop');
+            if (e.target === backdrop || e.target.dataset?.modalClose !== undefined || e.target.closest('[data-modal-close]')) {
+                hideKeyModal();
+            }
+        }
+
+        function _escKeyHandler(e) {
+            if (e.key === 'Escape') hideKeyModal();
+        }
+
+
+        // --- CONTROL DE PESTAÑAS ---
+
+        /**
+         * Cambia la pestaña activa y muestra el contenido correspondiente.
+         */
+
+    </script>
+</head>
+<body class="bg-gray-background font-sans min-h-screen">
+    
+    <!-- Contenedor de Mensajes (Alertas y Éxito) -->
+    <div id="message-box" class="hidden"></div>
+
+    <!-- Header SAGA (reemplazado: logo, carrito y dropdown de usuario funcional) -->
+    <header class="sticky top-0 z-40 bg-card-light shadow-md border-b border-gray-200">
+        <div class="flex items-center justify-between py-[1.2%] px-[2%]">
+
+            <!-- Logo -->
+            <div class="flex items-center space-x-4">
+                <a href="{% url 'index' %}" class="inline-flex items-center -ml-3 lg:ml-0">
+                    <img src="{% static 'core/img/saga-logo.png' %}" class="w-30 min-w-[60px] max-w-[90px] h-auto">
+                </a>
+            </div>
+
+            <!-- Título Página -->
+            <div class="hidden lg:block flex-grow text-center">
+                <h1 class="text-2xl font-bold text-gray-900">Mi Perfil</h1>
+            </div>
+
+            <!-- Iconos Derecha -->
+            <div class="flex items-center space-x-4">
+                {% if request.session.user_id %}
+                    <!-- Usuario autenticado -->
+                    <span class="text-sm text-gray-700 hidden sm:inline">
+                        Hola, <span class="font-semibold">{{ request.session.user_username|default:"Usuario" }}</span>
+                    </span>
+
+                    <!-- Carrito -->
+                    <a href="{% url 'pago' %}">
+                        <button id="cart-btn" aria-label="Carrito" class="relative p-2 rounded-full hover:bg-gray-100 focus:outline-none">
+                            <i data-lucide="shopping-cart" class="w-6 h-6 text-gray-700"></i>
+                            <span id="cart-count" class="absolute -top-1 -right-1 bg-saga-red text-white text-xs rounded-full px-1">0</span>
+                        </button>
+                    </a>
+
+                    <!-- Dropdown Usuario -->
+                    <div class="relative" id="user-menu-root">
+                        <button id="user-btn" aria-haspopup="true" aria-expanded="false" class="p-2 rounded-full hover:bg-gray-100 focus:outline-none">
+                            <i data-lucide="user" class="w-6 h-6 text-gray-700"></i>
+                        </button>
+
+                        <div id="user-dropdown" class="hidden origin-top-right absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-xl shadow-lg z-50 ring-1 ring-black ring-opacity-5 overflow-hidden">
+                            <div class="px-4 py-3 text-sm font-semibold text-gray-800 border-b">
+                                {{ request.session.user_username|default:"Usuario" }}
+                            </div>
+
+                            <button onclick="switchTab('personal')" class="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+                                <i data-lucide="user-cog" class="w-4 h-4 mr-3 text-gray-500"></i>
+                                Perfil
+                            </button>
+
+                            <button onclick="switchTab('payment')" class="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+                                <i data-lucide="credit-card" class="w-4 h-4 mr-3 text-gray-500"></i>
+                                Métodos de Pago
+                            </button>
+
+                            <button onclick="switchTab('security')" class="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+                                <i data-lucide="shield" class="w-4 h-4 mr-3 text-gray-500"></i>
+                                Seguridad
+                            </button>
+
+                            <button onclick="switchTab('history')" class="w-full text-left flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+                                <i data-lucide="list-check" class="w-4 h-4 mr-3 text-gray-500"></i>
+                                Historial
+                            </button>
+
+                            <div class="border-t border-gray-100"></div>
+
+                            <a href="{% url 'logout' %}" class="flex items-center px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition">
+                                <i data-lucide="log-out" class="w-4 h-4 mr-3 text-red-500"></i>
+                                Cerrar Sesión
+                            </a>
+                        </div>
+                    </div>
+
+                {% else %}
+                    <!-- No autenticado -->
+                    <a href="{% url 'login' %}" class="text-gray-700 hover:text-red-600 hover:underline transition-colors">
+                        Iniciar sesión
+                    </a>
+                    
+                    <a href="{% url 'login' %}">
+                        <button id="cart-btn" aria-label="Carrito" class="relative p-2 rounded-full hover:bg-gray-100">
+                            <i data-lucide="shopping-cart" class="w-6 h-6 text-gray-700"></i>
+                        </button>
+                    </a>
+
+                    <a href="{% url 'login' %}">
+                        <button class="p-2 rounded-full hover:bg-gray-100">
+                            <i data-lucide="user" class="w-6 h-6 text-gray-700"></i>
+                        </button>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <hr class="my-4 border-t-2 border-saga-red/80 mx-12">
+
+    <!-- Contenido Principal - Perfil de Usuario -->
+    <main class="main-content-area max-w-7xl mx-auto">
+        <header class="mb-6">
+            <h1 class="text-3xl font-extrabold text-gray-900 mb-2">Mi Cuenta</h1>
+            <p class="text-lg text-gray-600">Configura tu perfil, revisa tus métodos de pago y gestiona la seguridad.</p>
+        </header>
+
+        <!-- GRID PRINCIPAL - Navegación y Contenido -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            
+            <!-- Columna Izquierda: Navegación (1/4 de ancho) -->
+            <div class="lg:col-span-1 space-y-4">
+                <!-- Tarjeta de Perfil Rápida -->
+                <div class="bg-card-light p-6 rounded-xl shadow-lg border border-gray-200 text-center">
+                    <div class="mx-auto bg-gray-200 rounded-full w-20 h-20 flex items-center justify-center mb-3">
+                        <i data-lucide="user-circle-2" class="w-10 h-10 text-gray-500"></i>
+                    </div>
+                    <p class="text-xl font-bold text-gray-900" id="current-username">{{ user.usuario }}</p>
+                    <p class="text-sm text-gray-500">ID: <span id="user-id-display">{{ user.id_usuario }}</span></p>
+                    <p class="text-sm text-gray-500">País: <span id="user-country-display">{{ user.get_pais_display }}</span></p>
+                    <p class="text-xs text-gray-400 mt-1">{{ user.rol.nombre|upper }}</p>
+                </div>
+
+                <!-- Navegación por Pestañas -->
+                <nav class="bg-card-light p-2 rounded-xl shadow-lg border border-gray-200">
+                    <a href="#" id="nav-personal" onclick="switchTab('personal')" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 transition duration-150">
+                        <i data-lucide="user" class="w-5 h-5 mr-3"></i>
+                        Información Personal
+                    </a>
+                    <a href="#" id="nav-payment" onclick="switchTab('payment')" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 transition duration-150">
+                        <i data-lucide="credit-card" class="w-5 h-5 mr-3"></i>
+                        Métodos de Pago
+                    </a>
+                    <a href="#" id="nav-security" onclick="switchTab('security')" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 transition duration-150">
+                        <i data-lucide="shield" class="w-5 h-5 mr-3"></i>
+                        Seguridad
+                    </a>
+                    <a href="#nav-history" id="nav-history" onclick="switchTab('history')" class="nav-link flex items-center p-3 rounded-lg hover:bg-gray-100 transition duration-150">
+                        <i data-lucide="history" class="w-5 h-5 mr-3"></i>
+                        Historial de Compras
+                    </a>
+                </nav>
+            </div>
+
+            <!-- Columna Derecha: Contenido de la Pestaña (3/4 de ancho) -->
+            <div class="lg:col-span-3">
+                
+                <!-- Contenedor general que alberga el formulario o el placeholder -->
+                <div id="tab-content" class="bg-card-light p-8 rounded-xl shadow-lg border border-gray-200 min-h-[500px]">
+                    
+                    <!-- Contenido para Métodos de Pago, Historial, Seguridad (Inyectado por JS) -->
+                    <div id="placeholder-content" style="display: none;">
+                        <!-- El contenido se inyecta por JS al cambiar de pestaña -->
+                    </div>
+
+                    <!-- Formulario de Información Personal -->
+                    <form id="personal-info-form" onsubmit="saveProfile(event)" style="display: none;">
+                        {% csrf_token %}
+                        <h2 class="text-2xl font-bold text-gray-900 mb-6 border-b pb-2 flex items-center">
+                            <i data-lucide="user-cog" class="w-6 h-6 mr-2 text-saga-red"></i>
+                            Datos Personales y de Cuenta
+                        </h2>
+
+                        <!-- Fila 1: Nombre de Usuario y Email (Email es estático) -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <label for="profile-username" class="block text-sm font-medium text-gray-700 mb-2">Nombre de Usuario (Gamertag)</label>
+                                <input type="text" id="profile-username" class="input-style w-full bg-gray-100" required disabled> 
+                            </div>
+                            <div>
+                                <label for="profile-email" class="block text-sm font-medium text-gray-700 mb-2">Correo Electrónico (No Editable)</label>
+                                <input type="email" id="profile-email" class="input-style w-full bg-gray-100 cursor-not-allowed" disabled>
+                            </div>
+                        </div>
+
+                        <!-- Fila 2: Nombre y Apellidos -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <label for="profile-name" class="block text-sm font-medium text-gray-700 mb-2">Nombre</label>
+                                <input type="text" id="profile-name" class="input-style w-full bg-gray-100" required disabled>
+                            </div>
+                            <div>
+                                <label for="profile-lastName" class="block text-sm font-medium text-gray-700 mb-2">Apellidos</label>
+                                <input type="text" id="profile-lastName" class="input-style w-full bg-gray-100" required disabled>
+                            </div>
+                        </div>
+
+                        <!-- Fila 3: Fecha de Nacimiento y País -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <label for="profile-birthdate" class="block text-sm font-medium text-gray-700 mb-2">Fecha de Nacimiento</label>
+                                <input type="date" id="profile-birthdate" class="input-style w-full bg-gray-100" disabled>
+                            </div>
+                            <div>
+                                <label for="profile-country" class="block text-sm font-medium text-gray-700 mb-2">País de Residencia</label>
+                                <select id="profile-country" name="pais" class="input-style w-full bg-gray-100" disabled>
+                                    <option value="">-- Selecciona un país --</option>
+                                    {% for val,label in country_choices %}
+                                        <option value="{{ val }}" {% if val == user.pais %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        
+                        <!-- Botones de Acción -->
+                        <div class="border-t pt-6 flex space-x-4">
+                            
+                            <!-- Botón de Editar (Visible por defecto) -->
+                            <button 
+                                type="button"
+                                id="edit-button"
+                                onclick="toggleEditMode(true)"
+                                class="flex items-center px-6 py-3 border border-transparent text-base font-bold rounded-xl text-white bg-blue-600 hover:bg-blue-700 transition duration-300 shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300"
+                            >
+                                <i data-lucide="edit" class="w-5 h-5 mr-2"></i>
+                                Editar Perfil
+                            </button>
+
+                            <!-- Guardar Cambios -->
+                            <button
+                                type="submit"
+                                id="save-button"
+                                style="display: none;"
+                                class="flex items-center px-6 py-3 border border-transparent text-base font-bold rounded-xl text-white bg-[#e33d37] hover:bg-[#c5322d] transition duration-300 shadow-lg focus:outline-none focus:ring-4 focus:ring-red-300"
+                            >
+                                <i data-lucide="save" class="w-5 h-5 mr-2"></i>
+                                Guardar Cambios
+                            </button>
+                            
+                            <!-- Botón de Cancelar (Oculto por defecto) -->
+                            <button 
+                                type="button"
+                                id="cancel-button"
+                                onclick="cancelEdit()"
+                                style="display: none;"
+                                class="flex items-center px-6 py-3 border border-gray-300 text-base font-bold rounded-xl text-gray-700 bg-white hover:bg-gray-50 transition duration-300"
+                            >
+                                <i data-lucide="x" class="w-5 h-5 mr-2"></i>
+                                Cancelar
+                            </button>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL para la CLAVE de PRODUCTO -->
+    <div id="key-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden" aria-hidden="true">
+      <div class="modal-backdrop absolute inset-0 bg-black opacity-40" onclick="hideKeyModal()"></div>
+      <div class="modal-panel bg-white rounded-lg shadow-2xl z-10 w-full max-w-lg p-6 transform transition-transform">
+        <div class="flex justify-between items-center mb-4 border-b pb-3">
+          <h3 class="modal-title font-bold text-xl text-gray-900">Clave de Producto</h3>
+          <button type="button" onclick="hideKeyModal()" class="text-gray-500 hover:text-gray-700">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+        <div class="modal-keys max-h-64 overflow-auto mb-4"></div>
+        <div class="flex justify-end">
+          <button type="button" onclick="hideKeyModal()" class="px-4 py-2 bg-[#e53e3e] hover:bg-red-700 text-white font-semibold rounded-lg transition">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL STRIPE para añadir tarjeta -->
+    <div id="stripe-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 z-50 hidden items-center justify-center transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-xl p-8 w-11/12 max-w-md transform transition-transform duration-300 scale-100">
+            <div class="flex justify-between items-center mb-6 border-b pb-2">
+                <h2 class="text-2xl font-bold text-gray-900">Añadir Tarjeta</h2>
+                <button onclick="closeStripeModal()" class="text-gray-500 hover:text-gray-700">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <form id="stripe-form" onsubmit="handleStripeSubmit(event)">
+                <!-- Elemento de Stripe para la tarjeta -->
+                <div id="card-element" class="border border-gray-300 rounded-lg p-3 mb-4"></div>
+                <div id="card-errors" class="text-red-600 text-sm mb-4"></div>
+
+                <button type="submit" id="submit-stripe-btn" class="w-full bg-saga-red hover:bg-red-700 text-white font-bold py-3 rounded-xl transition">
+                    Guardar Tarjeta
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script de Stripe (al final del body) -->
+    <script src="https://js.stripe.com/v3/"></script>
+    <script>
+        let stripe, elements, cardElement;
+
+        function initStripe() {
+            stripe = Stripe('{{ STRIPE_PUBLIC_KEY }}');  // Se pasa desde context en Django
+            elements = stripe.elements();
+            cardElement = elements.create('card');
+            cardElement.mount('#card-element');
+
+            cardElement.on('change', (event) => {
+                const displayError = document.getElementById('card-errors');
+                if (event.error) {
+                    displayError.textContent = event.error.message;
+                } else {
+                    displayError.textContent = '';
+                }
+            });
+        }
+
+        async function handleStripeSubmit(event) {
+            event.preventDefault();
+            const btn = document.getElementById('submit-stripe-btn');
+            btn.disabled = true;
+            btn.textContent = 'Procesando...';
+
+            // Crear Payment Method
+            const { paymentMethod, error } = await stripe.createPaymentMethod({
+                type: 'card',
+                card: cardElement
+            });
+
+            if (error) {
+                document.getElementById('card-errors').textContent = error.message;
+                btn.disabled = false;
+                btn.textContent = 'Guardar Tarjeta';
+                return;
+            }
+
+            // Enviar al backend
+            const csrftoken = getCookie('csrftoken');
+            fetch('/api/payment-methods/add/', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({
+                    stripe_payment_method_id: paymentMethod.id,
+                    marca: paymentMethod.card.brand.charAt(0).toUpperCase() + paymentMethod.card.brand.slice(1),
+                    ultimos_4: paymentMethod.card.last4,
+                    vencimiento: `${paymentMethod.card.exp_month}/${paymentMethod.card.exp_year}`
+                })
+            })
+            .then(r => r.json())
+            .then(json => {
+                if (json.ok) {
+                    showMessage(json.message, 'success');
+                    closeStripeModal();
+                    cardElement.clear();
+                    loadPaymentMethods();
+                } else {
+                    showMessage(json.error || 'Error', 'error');
+                }
+            })
+            .catch(err => { console.error(err); showMessage('Error de red', 'error'); })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = 'Guardar Tarjeta';
+            });
+        }
+
+        window.addEventListener('load', () => {
+            initStripe();
+        });
+    </script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Valor que mandamos desde la vista
+    const initialTab = '{{ active_tab|default:"perfil"|escapejs }}';
+
+    // Si existe la función switchTab (la que ya usas en perfilDeUsuario), la llamamos
+    if (typeof switchTab === 'function') {
+        switchTab(initialTab);
+    } else {
+        console.warn('switchTab no está definida. Revisa tu perfil.js o el script de pestañas.');
+    }
+});
+</script>
+
+<script src="{% static 'core/js/perfil.js' %}"></script>
+
+</body>
+</html>

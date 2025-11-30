@@ -1,0 +1,259 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte de Juegos Vendidos SAGA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="{% static 'core/css/styles.css' %}">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'saga-red': '#e53e3e',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+        
+        // DATOS REALES DESDE EL BACKEND
+        const soldGames = JSON.parse('{{ ventas_json|escapejs }}');
+        const totalGlobal = parseFloat('{{ total_global }}');
+        let filteredGames = [...soldGames];
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2,
+            }).format(amount);
+        }
+
+        // Poblar filtros dinámicamente
+        function populateFilters() {
+            const genres = [...new Set(soldGames.map(g => g.genre))].filter(g => g !== 'N/A').sort();
+            const platforms = [...new Set(soldGames.map(g => g.platform))].filter(p => p !== 'N/A').sort();
+
+            const genreSelect = document.getElementById('filter-genre');
+            const platformSelect = document.getElementById('filter-platform');
+
+            genres.forEach(genre => {
+                const option = document.createElement('option');
+                option.value = genre;
+                option.textContent = genre;
+                genreSelect.appendChild(option);
+            });
+
+            platforms.forEach(platform => {
+                const option = document.createElement('option');
+                option.value = platform;
+                option.textContent = platform;
+                platformSelect.appendChild(option);
+            });
+        }
+
+        // Aplicar filtros
+        function applyFilters() {
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            const filterGenre = document.getElementById('filter-genre').value;
+            const filterPlatform = document.getElementById('filter-platform').value;
+
+            filteredGames = soldGames.filter(game => {
+                const nameMatch = game.gameName.toLowerCase().includes(searchTerm);
+                const genreMatch = !filterGenre || game.genre === filterGenre;
+                const platformMatch = !filterPlatform || game.platform === filterPlatform;
+
+                return nameMatch && genreMatch && platformMatch;
+            });
+
+            renderSoldGamesTable();
+        }
+        window.applyFilters = applyFilters;
+
+        function renderSoldGamesTable() {
+            const tableBody = document.getElementById('sold-games-table-body');
+            if (!tableBody) return;
+
+            if (filteredGames.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="8" class="px-6 py-8 text-center text-gray-500">No se encontraron juegos con los filtros aplicados</td></tr>';
+                document.getElementById('total-amount').textContent = formatCurrency(0);
+                return;
+            }
+
+            // Calcular total filtrado
+            const totalFiltrado = filteredGames.reduce((sum, game) => sum + game.totalSales, 0);
+
+            let tableRowsHtml = '';
+
+            filteredGames.forEach(game => {
+                // Recalcular porcentaje basado en datos filtrados
+                const percentage = (game.totalSales / totalFiltrado * 100);
+                
+                let percentClass = 'text-gray-600';
+                if (percentage > 50) {
+                    percentClass = 'text-green-600 font-extrabold';
+                } else if (percentage > 10) {
+                    percentClass = 'text-green-500 font-semibold';
+                }
+                
+                tableRowsHtml += `
+                    <tr class="border-b border-gray-100 hover:bg-gray-50 transition duration-150">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                            ${game.id}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-semibold truncate max-w-xs">
+                            ${game.gameName}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${game.genre}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">
+                            ${game.platform}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                            ${formatCurrency(game.unitPrice)}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold text-center">
+                            ${game.quantity}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-base font-black text-saga-red text-right">
+                            ${formatCurrency(game.totalSales)}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-base ${percentClass} font-bold text-right">
+                            ${percentage.toFixed(2)}%
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tableBody.innerHTML = tableRowsHtml;
+            document.getElementById('total-amount').textContent = formatCurrency(totalFiltrado);
+        }
+
+        window.onload = function() {
+            populateFilters();
+            renderSoldGamesTable();
+            lucide.createIcons();
+        }
+    </script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen p-4 sm:p-8">
+    
+    <div class="container mx-auto max-w-7xl">
+        
+        <!-- Header -->
+        <header class="mb-6 border-b pb-4 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <a href="{% url 'panel_admin' %}">
+                    <button class="px-4 py-2 bg-[#e53e3e] hover:bg-red-700 text-white rounded-lg transition flex items-center gap-2 font-semibold">
+                        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                        Volver
+                    </button>
+                </a>
+                <img src="{% static 'core/img/saga-logo.png' %}" alt="SAGA" class="w-24 h-auto">
+                <div>
+                    <h1 class="text-3xl font-extrabold text-gray-900">Reporte de Juegos Vendidos</h1>
+                    <p class="text-sm text-gray-500">Periodo: {{ fecha_inicio }} al {{ fecha_fin }}</p>
+                </div>
+            </div>
+        </header>
+
+        <!-- Controles de Filtrado -->
+        <div class="bg-white p-5 rounded-xl shadow-lg mb-6 border border-gray-100">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                
+                <!-- Búsqueda General -->
+                <div class="md:col-span-2">
+                    <label for="search-input" class="block text-xs font-medium text-gray-700 mb-1">Buscar Juego</label>
+                    <div class="relative">
+                        <input type="text" id="search-input" placeholder="Nombre del juego..." 
+                            class="w-full p-2 pl-10 border border-gray-300 rounded-lg focus:ring-saga-red focus:border-saga-red text-sm"
+                            onkeyup="applyFilters()">
+                        <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2"></i>
+                    </div>
+                </div>
+
+                <!-- Filtro por Género -->
+                <div>
+                    <label for="filter-genre" class="block text-xs font-medium text-gray-700 mb-1">Género</label>
+                    <select id="filter-genre" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-saga-red focus:border-saga-red text-sm" onchange="applyFilters()">
+                        <option value="">Todos los Géneros</option>
+                    </select>
+                </div>
+
+                <!-- Filtro por Plataforma -->
+                <div>
+                    <label for="filter-platform" class="block text-xs font-medium text-gray-700 mb-1">Plataforma</label>
+                    <select id="filter-platform" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-saga-red focus:border-saga-red text-sm" onchange="applyFilters()">
+                        <option value="">Todas las Plataformas</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contenido Principal -->
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-xl space-y-8">
+            
+            <!-- Título y Resumen -->
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-gray-200 pb-4">
+                <div class="space-y-1">
+                    <p class="text-sm font-medium text-gray-500">Análisis de Rendimiento de Productos</p>
+                    <h2 class="text-4xl font-extrabold text-gray-900">Juegos Vendidos</h2>
+                </div>
+                
+                <div class="mt-4 md:mt-0 text-right">
+                    <p class="text-xl text-gray-500 font-medium">VENTAS TOTALES</p>
+                    <p id="total-amount" class="text-4xl font-black text-[#e53e3e]"></p>
+                </div>
+            </div>
+
+            <!-- Tabla -->
+            <div class="overflow-x-auto rounded-xl border border-gray-200 shadow-lg">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                                ID Juego
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                                Nombre del Juego
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                                Género
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                                Plataforma
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider">
+                                Precio Unitario
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">
+                                Cantidad Vendida
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider">
+                                Ventas Totales
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-bold text-gray-600 uppercase tracking-wider">
+                                % Aporte a Ventas Totales
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="sold-games-table-body" class="bg-white divide-y divide-gray-200">
+                        <!-- Las filas se inyectan con JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+
+    </div>
+
+</body>
+</html>

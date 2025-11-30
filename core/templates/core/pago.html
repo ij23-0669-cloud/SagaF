@@ -1,0 +1,807 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finalizar Compra SAGA</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carga de Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="{% static 'core/css/styles.css' %}">
+    
+    <script>
+        // Configuración de Tailwind para usar la fuente Inter
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+
+        let userPaymentMethods = [];
+        let selectedPaymentMethod = null;
+        let isAdult = false;
+
+        function getCookie(name) {
+            const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+            return v ? v.pop() : '';
+        }
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2,
+            }).format(amount);
+        }
+
+        function showMessage(text, type = 'info') {
+            const messageBox = document.getElementById('message-box');
+            messageBox.textContent = text;
+            messageBox.className = 'fixed top-4 right-4 p-4 rounded-xl shadow-xl transition-all duration-300 transform translate-y-0 opacity-100 z-50';
+            
+            if (type === 'success') {
+                messageBox.classList.add('bg-green-500', 'text-white');
+            } else if (type === 'error') {
+                messageBox.classList.add('bg-red-500', 'text-white');
+            } else {
+                messageBox.classList.add('bg-blue-500', 'text-white');
+            }
+
+            setTimeout(() => {
+                messageBox.classList.add('translate-y-full', 'opacity-0');
+            }, 3000);
+            
+            setTimeout(() => {
+                messageBox.className = 'hidden';
+            }, 3500);
+        }
+
+        function showModal() {
+            document.getElementById('payment-modal').style.display = 'flex';
+        }
+
+        function hideModal() {
+            document.getElementById('payment-modal').style.display = 'none';
+        }
+
+        /**
+         * Carga los métodos de pago reales desde la BD.
+         */
+        function loadPaymentMethods() {
+            fetch('/api/payment-methods/')
+                .then(r => r.json())
+                .then(json => {
+                    if (json.ok) {
+                        userPaymentMethods = json.items || [];
+                        selectedPaymentMethod = userPaymentMethods.find(m => m.es_principal) || userPaymentMethods[0] || null;
+                        updatePaymentSummary();
+                    } else {
+                        console.error('Error cargando métodos:', json);
+                        updatePaymentSummary();
+                    }
+                })
+                .catch(err => { 
+                    console.error('Error:', err); 
+                    updatePaymentSummary();
+                });
+        }
+
+        /**
+         * Actualiza la sección del método de pago en la UI.
+         */
+        function updatePaymentSummary() {
+            const paymentDisplay = document.getElementById('payment-method-details');
+            const payBtn = document.getElementById('pay-button');
+            
+            if (userPaymentMethods.length > 0 && selectedPaymentMethod) {
+                const method = selectedPaymentMethod;
+                paymentDisplay.innerHTML = `
+                    <div class="p-3 rounded-lg flex items-center justify-between border border-green-500 bg-green-50">
+                        <div class="flex items-center text-green-700">
+                            <i data-lucide="credit-card" class="w-5 h-5 mr-2"></i>
+                            <div>
+                                <span class="font-semibold">${method.marca}</span>
+                                <p class="text-xs text-green-600">**** ${method.ultimos_4}</p>
+                            </div>
+                        </div>
+                        <span class="text-xs font-bold text-green-700">Activa</span>
+                    </div>
+                    <p class="text-sm text-gray-700 mt-2">
+                        Se cargará a tu tarjeta <strong>${method.marca} **** ${method.ultimos_4}</strong> (Vence: ${method.vencimiento})
+                    </p>
+                    <a href="{% url 'perfil_usuario' %}" class="text-saga-red hover:underline text-sm font-semibold mt-1 inline-block">
+                        Cambiar método de pago
+                    </a>
+                `;
+                // Habilitar botón (pero aún requiere términos)
+                payBtn.classList.remove('btn-disabled', 'opacity-50', 'cursor-not-allowed');
+                payBtn.classList.add('btn', 'btn-primary');
+                payBtn.disabled = false;
+                // OCULTAR MODAL
+                hideModal();
+            } else {
+                // Estado: No registrado
+                paymentDisplay.innerHTML = `
+                    <div class="p-3 rounded-lg flex items-center justify-between border border-red-300 bg-red-50">
+                        <div class="flex items-center text-red-500">
+                            <i data-lucide="alert-triangle" class="w-5 h-5 mr-2"></i>
+                            <span class="font-semibold">No se ha registrado un método de pago.</span>
+                        </div>
+                        <button onclick="window.location.href='{% url 'perfil_usuario' %}'" class="text-xs font-bold text-red-600 hover:underline">
+                            Añadir
+                        </button>
+                    </div>
+                    <a href="{% url 'perfil_usuario' %}" class="text-saga-red hover:underline text-sm font-semibold mt-2 inline-block">
+                        Ir al perfil para añadir método de pago
+                    </a>
+                `;
+                // Deshabilitar botón
+                payBtn.classList.remove('btn', 'btn-primary');
+                payBtn.classList.add('btn-disabled', 'opacity-50', 'cursor-not-allowed');
+                payBtn.disabled = true;
+                // MOSTRAR MODAL
+                showModal();
+            }
+            lucide.createIcons();
+        }
+
+        function checkAndProceedToPayment() {
+            const termsCheckbox = document.getElementById('terms-checkbox');
+            const termsAccepted = termsCheckbox.checked;
+            const totalAmount = parseFloat(document.getElementById('total-final-amount').textContent.replace(/[^0-9.-]+/g, ''));
+
+            // 1. Validar carrito vacío
+            if (!totalAmount || totalAmount <= 0) {
+                showMessage('🛒 Tu carrito está vacío. Añade productos antes de continuar.', 'error');
+                return;
+            }
+
+            // 2. Validar términos y condiciones
+            if (!termsAccepted) {
+                showMessage('⚠️ Debes aceptar los Términos y Condiciones para continuar.', 'error');
+                termsCheckbox.focus();
+                return;
+            }
+
+            // 3. Validar que haya método de pago
+            if (!userPaymentMethods.length || !selectedPaymentMethod) {
+                showMessage('❌ Debes registrar un método de pago primero.', 'error');
+                return;
+            }
+
+            // 4. Si pasa todas las validaciones, proceder con el pago
+            processPayment(totalAmount);
+        }
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(amount);
+        }
+
+        function alertMessage(text, type = 'info') {
+            const box = document.getElementById('message-box') || createMessageBox();
+            box.textContent = text;
+            box.className = 'fixed top-4 right-4 p-4 rounded-xl shadow-lg z-50 font-semibold ';
+            if (type === 'success') box.className += 'bg-green-600 text-white';
+            else if (type === 'error') box.className += 'bg-red-600 text-white';
+            else box.className += 'bg-blue-600 text-white';
+            setTimeout(() => box.className += ' opacity-0', 2500);
+        }
+
+        function createMessageBox() {
+            const box = document.createElement('div');
+            box.id = 'message-box';
+            document.body.appendChild(box);
+            return box;
+        }
+
+        function renderCart(items, total) {
+            const container = document.getElementById('cart-items-container');
+            if (!container) return;
+            
+            if (!items || items.length === 0) {
+                container.innerHTML = '<p class="text-gray-500">Tu carrito está vacío.</p>';
+                
+                // Deshabilitar botón si carrito vacío
+                const payBtn = document.getElementById('pay-button');
+                if (payBtn) {
+                    payBtn.classList.add('btn-disabled', 'opacity-50', 'cursor-not-allowed');
+                    payBtn.classList.remove('btn', 'btn-primary');
+                    payBtn.disabled = true;
+                    payBtn.innerHTML = '<i data-lucide="shopping-cart" class="w-5 h-5 mr-2"></i> Carrito Vacío';
+                }
+            } else {
+                container.innerHTML = items.map(i => `
+                    <div class="flex items-center py-4 border-b border-gray-100 last:border-b-0">
+                        <div class="w-16 h-16 mr-4 bg-gray-200 rounded-lg flex-shrink-0 overflow-hidden">
+                            <img src="${i.imagen_url || ''}" class="w-full h-full object-cover" alt="${i.producto_nombre}">
+                        </div>
+                        <div class="flex-grow">
+                            <p class="font-bold text-gray-900">${i.producto_nombre}</p>
+                            <p class="text-xs text-gray-600">${formatCurrency(i.precio_unitario)}</p>
+                        </div>
+                        <div class="flex items-center gap-2 mr-4">
+                            <button onclick="updateCartQuantity(${i.id_detalle}, ${i.cantidad - 1})" class="p-1 rounded hover:bg-gray-200">
+                                <i data-lucide="minus" class="w-4 h-4"></i>
+                            </button>
+                            <input type="number" value="${i.cantidad}" min="1" max="999" 
+                                onchange="updateCartQuantity(${i.id_detalle}, parseInt(this.value))"
+                                class="w-12 text-center border border-gray-300 rounded px-2 py-1 text-sm">
+                            <button onclick="updateCartQuantity(${i.id_detalle}, ${i.cantidad + 1})" class="p-1 rounded hover:bg-gray-200">
+                                <i data-lucide="plus" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="font-bold text-gray-900 min-w-[80px] text-right">${formatCurrency(i.subtotal)}</span>
+                            <button onclick="removeCartItem(${i.id_detalle})" class="p-2 rounded hover:bg-gray-100">
+                                <i data-lucide="trash-2" class="w-4 h-4 text-gray-500"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+                
+                // Habilitar botón si hay items y método de pago
+                const payBtn = document.getElementById('pay-button');
+                if (payBtn && userPaymentMethods.length > 0) {
+                    payBtn.classList.remove('btn-disabled', 'opacity-50', 'cursor-not-allowed');
+                    payBtn.classList.add('btn', 'btn-primary');
+                    payBtn.disabled = false;
+                }
+            }
+
+            document.getElementById('subtotal-display').textContent = formatCurrency(items.reduce((s, i) => s + (i.subtotal || 0), 0));
+            document.getElementById('service-fee-display').textContent = formatCurrency(0);
+            document.getElementById('discount-display').textContent = '-' + formatCurrency(0);
+            const totalFormatted = formatCurrency(total || 0);
+            document.getElementById('total-final-display').textContent = totalFormatted;
+            document.getElementById('total-final-amount').textContent = totalFormatted;
+            
+            const payBtn = document.getElementById('pay-button');
+            if (payBtn && items && items.length > 0) {
+                payBtn.innerHTML = `<i data-lucide="lock" class="w-5 h-5 mr-2"></i> Pagar ${totalFormatted}`;
+            }
+            
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function fetchCart() {
+            fetch('/api/cart/')
+                .then(r => r.json())
+                .then(json => {
+                    if (json.ok) {
+                        renderCart(json.items || [], json.total || 0);
+                    } else {
+                        alertMessage('Debes iniciar sesión', 'error');
+                    }
+                })
+                .catch(err => { console.error(err); alertMessage('Error cargando carrito', 'error'); });
+        }
+
+        function removeCartItem(id_detalle) {
+            const csrftoken = getCookie('csrftoken');
+            fetch('/api/cart/remove/', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({ id_detalle })
+            })
+            .then(r => r.json())
+            .then(json => {
+                if (json.ok) {
+                    renderCart(json.items || [], json.total || 0);
+                    alertMessage('Artículo eliminado', 'success');
+                } else {
+                    alertMessage('Error', 'error');
+                }
+            })
+            .catch(err => { console.error(err); });
+        }
+
+        function updateCartQuantity(id_detalle, newQuantity) {
+            if (newQuantity < 1) {
+                removeCartItem(id_detalle);
+                return;
+            }
+            const csrftoken = getCookie('csrftoken');
+            fetch('/api/cart/update/', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({ id_detalle, cantidad: newQuantity })
+            })
+            .then(r => r.json())
+            .then(json => {
+                if (json.ok) {
+                    renderCart(json.items || [], json.total || 0);
+                } else {
+                    alertMessage('Error actualizando', 'error');
+                    fetchCart();
+                }
+            })
+            .catch(err => { console.error(err); });
+        }
+
+        async function processPayment(totalUSD) {
+            const payBtn = document.getElementById('pay-button');
+            payBtn.disabled = true;
+            payBtn.textContent = 'Procesando...';
+
+            const montoCentavos = Math.round(totalUSD * 100);
+            const csrftoken = getCookie('csrftoken');
+
+            try {
+                const response = await fetch('/api/process-payment/', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                    body: JSON.stringify({ monto_centavos: montoCentavos })
+                });
+
+                const json = await response.json();
+
+                if (json.ok) {
+                    // redirigir a la vista de factura que renderiza factura.html
+                    window.location.href = `/factura/${json.factura_id}/`;
+                } else {
+                    alertMessage(`Error: ${json.error}`, 'error');
+                    payBtn.disabled = false;
+                    payBtn.textContent = `Pagar ${formatCurrency(totalUSD)}`;
+                }
+            } catch (err) {
+                console.error(err);
+                alertMessage('Error de red', 'error');
+                payBtn.disabled = false;
+                payBtn.textContent = `Pagar ${formatCurrency(totalUSD)}`;
+            }
+        }
+
+        window.addEventListener('load', function() {
+            // Cargar métodos de pago reales
+            loadPaymentMethods();
+            
+            // Cargar carrito
+            fetchCart();
+            
+            // Enlazar botón de pago
+            document.getElementById('pay-button').onclick = checkAndProceedToPayment;
+            
+            lucide.createIcons();
+        });
+    </script>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen">
+    
+    <!-- Contenedor de Mensajes (Alertas y Éxito) -->
+    <div id="message-box" class="hidden"></div>
+
+    <!-- Header SAGA (reemplazado: logo, carrito y dropdown de usuario funcional) -->
+    <header class="sticky top-0 z-40 bg-card-light shadow-md border-b border-gray-200">
+        <div class="flex items-center justify-between py-[1.2%] px-[2%]">
+
+            <!-- Logo -->
+            <div class="flex items-center space-x-4">
+                <a href="{% url 'index' %}" class="inline-flex items-center -ml-3 lg:ml-0">
+                    <img src="{% static 'core/img/saga-logo.png' %}" class="w-30 min-w-[60px] max-w-[90px] h-auto">
+                </a>
+            </div>
+
+            <!-- Título Página -->
+            <div class="hidden lg:block flex-grow text-center">
+                <h1 class="text-2xl font-bold text-gray-900">Finalizar Compra</h1>
+            </div>
+
+            <!-- Iconos Derecha -->
+            <div class="flex items-center space-x-4">
+                {% if request.session.user_id %}
+                    <!-- Usuario autenticado -->
+                    <span class="text-sm text-gray-700 hidden sm:inline">
+                        Hola, <span class="font-semibold">{{ request.session.user_username|default:"Usuario" }}</span>
+                    </span>
+
+                    <!-- Carrito -->
+                    <a href="{% url 'pago' %}">
+                        <button id="cart-btn" aria-label="Carrito" class="relative p-2 rounded-full hover:bg-gray-100 focus:outline-none">
+                            <i data-lucide="shopping-cart" class="w-6 h-6 text-gray-700"></i>
+                            <span id="cart-count" class="absolute -top-1 -right-1 bg-saga-red text-white text-xs rounded-full px-1">0</span>
+                        </button>
+                    </a>
+
+                    <!-- Dropdown Usuario -->
+                    <div class="relative" id="user-menu-root">
+                        <button id="user-btn" aria-haspopup="true" aria-expanded="false" class="p-2 rounded-full hover:bg-gray-100 focus:outline-none">
+                            <i data-lucide="user" class="w-6 h-6 text-gray-700"></i>
+                        </button>
+
+                        <div id="user-dropdown" class="hidden origin-top-right absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-xl shadow-lg z-50 ring-1 ring-black ring-opacity-5 overflow-hidden">
+                            <div class="px-4 py-3 text-sm font-semibold text-gray-800 border-b">
+                                {{ request.session.user_username|default:"Usuario" }}
+                            </div>
+
+                            <a href="{% url 'perfil_usuario' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+                                <i data-lucide="user-cog" class="w-4 h-4 mr-3 text-gray-500"></i>
+                                Perfil
+                            </a>
+
+                            <a href="{% url 'perfil_usuario' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+                                <i data-lucide="list-check" class="w-4 h-4 mr-3 text-gray-500"></i>
+                                Historial
+                            </a>
+
+                            <div class="border-t border-gray-100"></div>
+
+                            <a href="{% url 'logout' %}" class="flex items-center px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition">
+                                <i data-lucide="log-out" class="w-4 h-4 mr-3 text-red-500"></i>
+                                Cerrar Sesión
+                            </a>
+                        </div>
+                    </div>
+
+                {% else %}
+                    <!-- No autenticado -->
+                    <a href="{% url 'login' %}" class="text-gray-700 hover:text-red-600 hover:underline transition-colors">
+                        Iniciar sesión
+                    </a>
+                    
+                    <a href="{% url 'login' %}">
+                        <button id="cart-btn" aria-label="Carrito" class="relative p-2 rounded-full hover:bg-gray-100">
+                            <i data-lucide="shopping-cart" class="w-6 h-6 text-gray-700"></i>
+                        </button>
+                    </a>
+
+                    <a href="{% url 'login' %}">
+                        <button id="user-btn" class="p-2 rounded-full hover:bg-gray-100">
+                            <i data-lucide="user" class="w-6 h-6 text-gray-700"></i>
+                        </button>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <hr style="border: 2px solid #e53e3e; margin-left: 10%; margin-right: 10%;">
+    <!-- Contenido Principal - Confirmación de Compra -->
+    <main class="main-content-area max-w-7xl mx-auto">
+        <header class="mb-6">
+            <h1 class="text-3xl font-extrabold text-gray-900 mb-2">Finalizar Compra</h1>
+            <!-- Línea divisoria roja -->
+            <p class="text-lg text-gray-600">Revisa los detalles de tu pedido y selecciona tu método de pago final.</p>
+        </header>
+
+        <!-- GRID PRINCIPAL -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Columna Izquierda: Artículos y Métodos de Pago (2/3 de ancho en desktop) -->
+            <div class="lg:col-span-2 space-y-8">
+                
+                <!-- Card: Artículos en tu Pedido -->
+                <div class="bg-card-light p-6 rounded-xl shadow-lg border border-gray-100">
+                    <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center border-b pb-2">
+                        <i data-lucide="package" class="w-5 h-5 mr-2 text-saga-red"></i>
+                        Artículos en tu Pedido
+                    </h2>
+                    <div id="cart-items-container" class="space-y-2">
+                        <!-- Items inyectados por JS -->
+                    </div>
+                </div>
+
+                <!-- Card: Método de Pago -->
+                <div class="bg-card-light p-6 rounded-xl shadow-lg border border-gray-100">
+                    <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center border-b pb-2">
+                        <i data-lucide="wallet" class="w-5 h-5 mr-2 text-saga-red"></i>
+                        Método de Pago
+                    </h2>
+                    
+                    <div id="payment-method-details" class="space-y-2">
+                        <!-- Detalles del método de pago inyectados por JS (Activo o No registrado) -->
+                    </div>
+
+                    <!-- Checkbox de Aceptación -->
+                    <div class="mt-6 flex items-center">
+                        <input id="terms-checkbox" type="checkbox" class="h-4 w-4 text-saga-red border-gray-300 rounded focus:ring-saga-red">
+                        <label for="terms-checkbox" class="ml-2 text-sm text-gray-700">
+                            Acepto los <a href="#" class="text-saga-red hover:underline font-semibold">Términos y Condiciones</a> de SAGA y confirmo que soy mayor de 18 años.
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Resumen de Pedido (1/3 de ancho en desktop) -->
+            <div class="lg:col-span-1 bg-card-light p-6 rounded-xl shadow-lg border border-red-300 border-opacity-70">
+                <h2 class="text-xl font-bold text-gray-900 mb-4 border-b pb-2">
+                    Resumen de Pedido
+                </h2>
+                
+                <div class="space-y-2 text-sm">
+                    <!-- Subtotal -->
+                    <div class="flex justify-between">
+                        <span class="text-gray-700">Subtotal de Artículos:</span>
+                        <span id="subtotal-display" class="font-semibold text-gray-900"></span>
+                    </div>
+                    <!-- Tarifa de Servicio -->
+                    <div class="flex justify-between">
+                        <span class="text-gray-700">Tarifa de Servicio SAGA:</span>
+                        <span id="service-fee-display" class="font-semibold text-gray-900"></span>
+                    </div>
+                    <!-- Descuento -->
+                    <div class="flex justify-between">
+                        <span class="font-bold text-green-600">Descuento Promocional:</span>
+                        <span id="discount-display" class="font-bold text-green-600"></span>
+                    </div>
+                    
+                    <!-- Total Final (Destacado) -->
+                    <div class="border-t border-gray-200 pt-3 mt-3">
+                        <div class="flex justify-between items-end">
+                            <span class="text-xl font-extrabold text-gray-900">Total Final:</span>
+                            <span id="total-final-display" class="text-3xl font-black text-saga-red"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aviso de Cargo y Pago -->
+                <p class="text-xs text-gray-500 text-center mt-4 mb-4">
+                    El cargo se hará en USD y puede incluir impuestos locales.
+                </p>
+
+                <!-- Botón de Pago -->
+                <button 
+                    id="pay-button"
+                    class="btn btn-disabled w-full flex items-center justify-center px-6 py-3 border border-transparent text-base font-bold rounded-xl text-white transition duration-300 shadow-md focus:outline-none focus:ring-4 focus:ring-red-300"
+                    disabled
+                >
+                    <!-- El texto y el total se inyectan en JS -->
+                </button>
+                <div id="total-final-amount" class="hidden"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal de Añadir Método de Pago (Aparece si no hay método) -->
+    <div id="payment-modal" class="modal-overlay fixed inset-0 flex items-center justify-center p-4">
+        <div class="bg-card-light w-full max-w-md p-6 rounded-xl shadow-2xl transform transition-all scale-100">
+            
+            <!-- Cabecera del Modal -->
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 class="text-xl font-bold text-saga-red flex items-center">
+                    <i data-lucide="alert-triangle" class="w-6 h-6 mr-2"></i>
+                    Añadir Método de Pago
+                </h3>
+                <button onclick="hideModal()" class="text-gray-400 hover:text-gray-600 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <!-- Cuerpo del Modal -->
+            <div class="mb-6 space-y-4">
+                <p class="text-gray-700">
+                    Para finalizar tu compra, por favor registra una tarjeta de crédito o débito.
+                </p>
+                <div class="p-3 bg-red-50 border border-red-200 text-red-800 rounded-lg flex items-start">
+                    <i data-lucide="credit-card" class="w-5 h-5 mt-1 mr-3 flex-shrink-0"></i>
+                    <p class="text-sm font-medium">
+                        Tu carrito está listo, ¡solo falta tu método de pago!
+                    </p>
+                </div>
+            </div>
+
+            <!-- Acciones del Modal -->
+            <div class="flex justify-end space-x-3">
+                <button 
+                    onclick="hideModal()"
+                    class="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                >
+                    Cancelar
+                </button>
+                <button 
+                    onclick="mockAddPaymentMethod()"
+                    class="px-4 py-2 text-white font-semibold btn btn-primary rounded-lg shadow-md"
+                    id="add-method-btn"
+                >
+                    <i data-lucide="plus" class="w-4 h-4 mr-1 inline-block"></i>
+                    Añadir Método
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Reemplazo del script de inicialización del dropdown (funcional, cierre fuera y con Esc) -->
+    
+<script src="{% static 'core/js/perfil.js' %}"></script>
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+    function formatCurrency(amount) {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(amount);
+    }
+
+    function getCookie(name) {
+        const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return v ? v.pop() : '';
+    }
+
+    function alertMessage(text, type = 'info') {
+        const box = document.getElementById('message-box') || createMessageBox();
+        box.textContent = text;
+        box.className = 'fixed top-4 right-4 p-4 rounded-xl shadow-lg z-50 font-semibold ';
+        if (type === 'success') box.className += 'bg-green-600 text-white';
+        else if (type === 'error') box.className += 'bg-red-600 text-white';
+        else box.className += 'bg-blue-600 text-white';
+        setTimeout(() => box.className += ' opacity-0', 2500);
+    }
+
+    function createMessageBox() {
+        const box = document.createElement('div');
+        box.id = 'message-box';
+        document.body.appendChild(box);
+        return box;
+    }
+
+    function renderCart(items, total) {
+        const container = document.getElementById('cart-items-container');
+        if (!container) return;
+        
+        if (!items || items.length === 0) {
+            container.innerHTML = '<p class="text-gray-500">Tu carrito está vacío.</p>';
+            
+            // Deshabilitar botón si carrito vacío
+            const payBtn = document.getElementById('pay-button');
+            if (payBtn) {
+                payBtn.classList.add('btn-disabled', 'opacity-50', 'cursor-not-allowed');
+                payBtn.classList.remove('btn', 'btn-primary');
+                payBtn.disabled = true;
+                payBtn.innerHTML = '<i data-lucide="shopping-cart" class="w-5 h-5 mr-2"></i> Carrito Vacío';
+            }
+        } else {
+            container.innerHTML = items.map(i => `
+                <div class="flex items-center py-4 border-b border-gray-100 last:border-b-0">
+                    <div class="w-16 h-16 mr-4 bg-gray-200 rounded-lg flex-shrink-0 overflow-hidden">
+                        <img src="${i.imagen_url || ''}" class="w-full h-full object-cover" alt="${i.producto_nombre}">
+                    </div>
+                    <div class="flex-grow">
+                        <p class="font-bold text-gray-900">${i.producto_nombre}</p>
+                        <p class="text-xs text-gray-600">${formatCurrency(i.precio_unitario)}</p>
+                    </div>
+                    <div class="flex items-center gap-2 mr-4">
+                        <button onclick="updateCartQuantity(${i.id_detalle}, ${i.cantidad - 1})" class="p-1 rounded hover:bg-gray-200">
+                            <i data-lucide="minus" class="w-4 h-4"></i>
+                        </button>
+                        <input type="number" value="${i.cantidad}" min="1" max="999" 
+                            onchange="updateCartQuantity(${i.id_detalle}, parseInt(this.value))"
+                            class="w-12 text-center border border-gray-300 rounded px-2 py-1 text-sm">
+                        <button onclick="updateCartQuantity(${i.id_detalle}, ${i.cantidad + 1})" class="p-1 rounded hover:bg-gray-200">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="font-bold text-gray-900 min-w-[80px] text-right">${formatCurrency(i.subtotal)}</span>
+                        <button onclick="removeCartItem(${i.id_detalle})" class="p-2 rounded hover:bg-gray-100">
+                            <i data-lucide="trash-2" class="w-4 h-4 text-gray-500"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Habilitar botón si hay items y método de pago
+            const payBtn = document.getElementById('pay-button');
+            if (payBtn && userPaymentMethods.length > 0) {
+                payBtn.classList.remove('btn-disabled', 'opacity-50', 'cursor-not-allowed');
+                payBtn.classList.add('btn', 'btn-primary');
+                payBtn.disabled = false;
+            }
+        }
+
+        document.getElementById('subtotal-display').textContent = formatCurrency(items.reduce((s, i) => s + (i.subtotal || 0), 0));
+        document.getElementById('service-fee-display').textContent = formatCurrency(0);
+        document.getElementById('discount-display').textContent = '-' + formatCurrency(0);
+        const totalFormatted = formatCurrency(total || 0);
+        document.getElementById('total-final-display').textContent = totalFormatted;
+        document.getElementById('total-final-amount').textContent = totalFormatted;
+        
+        const payBtn = document.getElementById('pay-button');
+        if (payBtn && items && items.length > 0) {
+            payBtn.innerHTML = `<i data-lucide="lock" class="w-5 h-5 mr-2"></i> Pagar ${totalFormatted}`;
+        }
+        
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function fetchCart() {
+        fetch('/api/cart/')
+            .then(r => r.json())
+            .then(json => {
+                if (json.ok) {
+                    renderCart(json.items || [], json.total || 0);
+                } else {
+                    alertMessage('Debes iniciar sesión', 'error');
+                }
+            })
+            .catch(err => { console.error(err); alertMessage('Error cargando carrito', 'error'); });
+    }
+
+    function removeCartItem(id_detalle) {
+        const csrftoken = getCookie('csrftoken');
+        fetch('/api/cart/remove/', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+            body: JSON.stringify({ id_detalle })
+        })
+        .then(r => r.json())
+        .then(json => {
+            if (json.ok) {
+                renderCart(json.items || [], json.total || 0);
+                alertMessage('Artículo eliminado', 'success');
+            } else {
+                alertMessage('Error', 'error');
+            }
+        })
+        .catch(err => { console.error(err); });
+    }
+
+    function updateCartQuantity(id_detalle, newQuantity) {
+        if (newQuantity < 1) {
+            removeCartItem(id_detalle);
+            return;
+        }
+        const csrftoken = getCookie('csrftoken');
+        fetch('/api/cart/update/', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+            body: JSON.stringify({ id_detalle, cantidad: newQuantity })
+        })
+        .then(r => r.json())
+        .then(json => {
+            if (json.ok) {
+                renderCart(json.items || [], json.total || 0);
+            } else {
+                alertMessage('Error actualizando', 'error');
+                fetchCart();
+            }
+        })
+        .catch(err => { console.error(err); });
+    }
+
+    async function processPayment(totalUSD) {
+        const payBtn = document.getElementById('pay-button');
+        payBtn.disabled = true;
+        payBtn.textContent = 'Procesando...';
+
+        const montoCentavos = Math.round(totalUSD * 100);
+        const csrftoken = getCookie('csrftoken');
+
+        try {
+            const response = await fetch('/api/process-payment/', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                body: JSON.stringify({ monto_centavos: montoCentavos })
+            });
+
+            const json = await response.json();
+
+            if (json.ok) {
+                // redirigir a la vista de factura que renderiza factura.html
+                window.location.href = `/factura/${json.factura_id}/`;
+            } else {
+                alertMessage(`Error: ${json.error}`, 'error');
+                payBtn.disabled = false;
+                payBtn.textContent = `Pagar ${formatCurrency(totalUSD)}`;
+            }
+        } catch (err) {
+            console.error(err);
+            alertMessage('Error de red', 'error');
+            payBtn.disabled = false;
+            payBtn.textContent = `Pagar ${formatCurrency(totalUSD)}`;
+        }
+    }
+
+    window.addEventListener('load', function() {
+        fetchCart();
+    });
+</script>
+</body>
+</html>
