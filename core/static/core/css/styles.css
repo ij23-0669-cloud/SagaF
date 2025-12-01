@@ -30,11 +30,10 @@ body{
 
 /* Contenedor global y utilidades de layout */
 .container, .main-content-area, .admin-layout, .content-container{
-    max-width:var(--container-max);
-    margin-left:auto;
-    margin-right:auto;
-    padding-left:1.5rem;
-    padding-right:1.5rem;
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0.6% !important;
+    padding: 0 !important;
 }
 @media (min-width:1024px){
     .container, .main-content-area, .admin-layout, .content-container{
