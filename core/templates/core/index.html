@@ -103,7 +103,8 @@
 
             return `
                 <div class="game-card bg-card-light rounded-xl shadow-lg overflow-hidden border border-gray-200 transition duration-300 hover:border-saga-red hover:shadow-xl hover:scale-[1.01] min-w-[280px] flex-shrink-0">
-                    <img src="${imageUrl}" alt="${(game.nombre || '').replace(/"/g,'')}" class="w-full h-48 object-cover" onerror="this.onerror=null; this.src='https://placehold.co/400x225/e5e5e5/333333?text=SAGA';" />
+                    <img src="${imageUrl}" alt="${(game.nombre || '').replace(/"/g,'')}" class="w-full object-cover" style="aspect-ratio: 2 / 3; height: auto;" onerror="this.onerror=null; this.src='https://placehold.co/400x600/e5e5e5/333333?text=SAGA';" />
+
                     <div class="p-4 space-y-3">
                         <h3 class="text-lg font-semibold text-gray-800 line-clamp-2">${game.nombre || '—'}</h3>
                         <p class="text-xs text-gray-500 font-mono">${game.plataforma || 'N/A'}</p>
