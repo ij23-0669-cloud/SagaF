@@ -196,7 +196,12 @@ function renderGameSection(containerId, title, games) {
         }
 
         function applyFilters() {
-            const searchEl = document.querySelector('input[placeholder*="Buscar"]');
+            // Seleccionar el input de búsqueda visible (móvil o desktop)
+            const allSearchInputs = Array.from(document.querySelectorAll('input[placeholder*="Buscar"]'));
+            const searchEl = allSearchInputs.find(el => {
+                // elemento visible: tiene tamaño en layout
+                try { return el.offsetWidth > 0 && el.offsetHeight > 0; } catch (e) { return false; }
+            }) || allSearchInputs[0];
             const searchTerm = (searchEl && searchEl.value) ? searchEl.value.toLowerCase().trim() : '';
 
             const checkedPlatforms = Array.from(document.querySelectorAll('#platform-filter input[type="checkbox"]:checked')).map(i => i.value);
@@ -435,7 +440,8 @@ function renderGameSection(containerId, title, games) {
         <aside id="sidebar" 
             class="fixed lg:sticky top-0 left-0 w-64 lg:top-20 h-full lg:h-auto bg-card-light lg:bg-transparent p-6 space-y-8 z-50 
                    transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out 
-                   lg:border-r border-gray-200 flex-shrink-0 overflow-y-auto shadow-xl lg:shadow-none">
+                   lg:border-r border-gray-200 flex-shrink-0 overflow-y-auto shadow-xl lg:shadow-none
+                   pointer-events-none lg:pointer-events-auto">
             
             <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center justify-between">
                 Filtros
@@ -493,7 +499,7 @@ function renderGameSection(containerId, title, games) {
         </aside>
 
         <!-- 4. Catálogo de Juegos (Contenido Principal) -->
-        <section class="flex-1 min-w-0 space-y-12 pb-12 content-container lg:ml-0 lg:pl-0">
+        <section class="flex-1 min-w-0 space-y-12 pb-12 content-containerINDEX lg:ml-0 lg:pl-0">
             
             <!-- Sección: Novedades y Ofertas -->
             <div id="section-novedades">
@@ -511,21 +517,60 @@ function renderGameSection(containerId, title, games) {
             </div>
 
         </section>
-
-
+        
+    
 
 
     </main>
 <script>
+// Mobile sidebar toggle + helpers
+function toggleSidebar(forceClose = false) {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (!sidebar || !overlay) return;
+
+    const isOpen = !sidebar.classList.contains('-translate-x-full') && !sidebar.classList.contains('pointer-events-none');
+    if (forceClose || isOpen) {
+        sidebar.classList.add('-translate-x-full', 'pointer-events-none');
+        overlay.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    } else {
+        sidebar.classList.remove('-translate-x-full', 'pointer-events-none');
+        overlay.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    }
+}
+
+// Ensure sidebar state is correct on resize (desktop breakpoint)
+(function () {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    function onChange(e) {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        if (!sidebar || !overlay) return;
+        if (e.matches) { // desktop
+            sidebar.classList.remove('-translate-x-full', 'pointer-events-none');
+            overlay.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        } else { // mobile: keep it hidden by default
+            sidebar.classList.add('-translate-x-full', 'pointer-events-none');
+            overlay.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        }
+    }
+    mq.addEventListener ? mq.addEventListener('change', onChange) : mq.addListener(onChange);
+    onChange(mq);
+})();
+
+// Small helper: keep header inputs interactive if overlay present only when sidebar open
+document.getElementById('sidebar-overlay')?.addEventListener('click', () => toggleSidebar(true));
+
+// Backwards-compatible simple slider helper (kept minimal)
 function scrollSlider(id, direction) {
     const track = document.getElementById(`${id}-track`);
     if (!track) return;
-
-    const cardWidth = 280; // card + gap
-    track.scrollBy({
-        left: direction * cardWidth,
-        behavior: "smooth"
-    });
+    const cardWidth = Math.max(200, Math.round(track.clientWidth * 0.7));
+    track.scrollBy({ left: direction * cardWidth, behavior: 'smooth' });
 }
 </script>
 <script src="{% static 'core/js/perfil.js' %}"></script>
