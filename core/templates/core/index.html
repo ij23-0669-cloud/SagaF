@@ -124,6 +124,54 @@
             `;
         }
 
+        // Card HTML optimizada para grid (sin min-width ni flex-shrink)
+        function createGridCardHtml(game) {
+            const price = parseFloat(game.precio) || 0;
+            const priceText = price === 0 ? 'Gratis' : `$${price.toFixed(2)}`;
+            const isFree = price === 0;
+            const bgColor = isFree ? '#22c55e' : '#dc2626';
+            const hoverBgColor = isFree ? '#16a34a' : '#b91c1c';
+            const imageUrl = game.imagen_url || 'https://placehold.co/400x225/e5e5e5/333333?text=SAGA';
+
+            return `
+                <article class="bg-card-light rounded-xl shadow-lg overflow-hidden border border-gray-200 transition duration-300 hover:border-saga-red hover:shadow-xl">
+                    <img src="${imageUrl}" alt="${(game.nombre || '').replace(/"/g,'')}" class="w-full object-cover" style="aspect-ratio: 2 / 3; height: auto;" onerror="this.onerror=null; this.src='https://placehold.co/400x600/e5e5e5/333333?text=SAGA';" />
+                    <div class="p-4 space-y-2">
+                        <h3 class="text-base font-semibold text-gray-800 line-clamp-2">${game.nombre || '—'}</h3>
+                        <p class="text-xs text-gray-500 font-mono">${game.plataforma || 'N/A'}</p>
+                        <div class="flex items-center justify-between pt-2 gap-2">
+                            <span class="text-lg font-extrabold ${price === 0 ? 'text-green-500' : 'text-saga-red'}">${priceText}</span>
+                            <button onclick="addToCart(${game.id_producto})" 
+                                style="background-color: ${bgColor};" 
+                                onmouseover="this.style.backgroundColor='${hoverBgColor}'"
+                                onmouseout="this.style.backgroundColor='${bgColor}'"
+                                class="flex items-center gap-1 text-white px-3 py-2 rounded-lg text-xs font-semibold transition duration-200 shadow-md whitespace-nowrap">
+                                <i data-lucide="${price === 0 ? 'download' : 'shopping-cart'}" class="w-4 h-4"></i>
+                                ${price === 0 ? 'Jugar' : 'Añadir'}
+                            </button>
+                        </div>
+                    </div>
+                </article>
+            `;
+        }
+
+        // Renderiza una sección en formato grid (útil para resultados/ búsqueda)
+        function renderGridSection(containerId, title, games) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            if (!games || games.length === 0) {
+                container.innerHTML = `<h2 class="text-3xl font-extrabold text-gray-900 mb-4">${title}</h2><div class="text-center py-8"><p class="text-gray-500 text-lg">No hay Juegos que coincidan</p></div>`;
+                return;
+            }
+            container.innerHTML = `
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-4">${title}</h2>
+                <div class="grid gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                    ${games.map(createGridCardHtml).join('')}
+                </div>
+            `;
+            safeCreateIcons();
+        }
+
 function renderGameSection(containerId, title, games) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -245,7 +293,8 @@ function renderGameSection(containerId, title, games) {
                 resultTitle += ` - Precio: ${minText} - ${maxText}`;
             }
 
-            renderGameSection('section-populares', resultTitle + ` (${currentFiltered.length})`, currentFiltered);
+            // Mostrar resultados como grid en vez de carrusel cuando hay búsqueda/ filtros activos
+            renderGridSection('section-populares', resultTitle + ` (${currentFiltered.length})`, currentFiltered);
         }
 
         function updatePriceDisplay() {
