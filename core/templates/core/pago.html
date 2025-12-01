@@ -423,12 +423,26 @@
                                 {{ request.session.user_username|default:"Usuario" }}
                             </div>
 
-                            <a href="{% url 'perfil_usuario' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+                            <a href="{% url 'perfil_usuario' %}?tab=personal" 
+                            class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition nav-link">
                                 <i data-lucide="user-cog" class="w-4 h-4 mr-3 text-gray-500"></i>
                                 Perfil
                             </a>
 
-                            <a href="{% url 'perfil_usuario' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+                            <a href="{% url 'perfil_usuario' %}?tab=payment" 
+                            class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition nav-link">
+                                <i data-lucide="credit-card" class="w-4 h-4 mr-3 text-gray-500"></i>
+                                Métodos de Pago
+                            </a>
+
+                            <a href="{% url 'perfil_usuario' %}?tab=security" 
+                            class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition nav-link">
+                                <i data-lucide="shield" class="w-4 h-4 mr-3 text-gray-500"></i>
+                                Seguridad
+                            </a>
+
+                            <a href="{% url 'perfil_usuario' %}?tab=history" 
+                            class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition nav-link">
                                 <i data-lucide="list-check" class="w-4 h-4 mr-3 text-gray-500"></i>
                                 Historial
                             </a>
