@@ -169,7 +169,7 @@ def perfil_usuario(request):
     
     usuario = get_object_or_404(Usuario, id_usuario=user_id)
     
-    # Obtener choices del campo 'pais' (si el campo usa choices o django-countries)
+    # Obtener choices del campo 'pais'
     try:
         country_field = Usuario._meta.get_field('pais')
         country_choices = getattr(country_field, 'choices', None) or []
@@ -177,17 +177,19 @@ def perfil_usuario(request):
         country_choices = []
 
     # Leer el tab desde la URL ?tab=...
-    active_tab = request.GET.get('tab', 'perfil')
-    # Por seguridad, limitar a los tabs válidos
-    valid_tabs = {'perfil', 'metodos', 'seguridad', 'historial'}
+    active_tab = request.GET.get('tab', 'personal')
+
+    # Tabs válidos (los que usa switchTab())
+    valid_tabs = {'personal', 'payment', 'security', 'history'}
+
     if active_tab not in valid_tabs:
-        active_tab = 'perfil'
+        active_tab = 'personal'
 
     context = {
         'user': usuario,
         'country_choices': country_choices,
         'STRIPE_PUBLIC_KEY': settings.STRIPE_PUBLIC_KEY,
-        'active_tab': active_tab,   # ⬅️ NUEVO
+        'active_tab': active_tab,
     }
     return render(request, 'core/perfilDeUsuario.html', context)
 

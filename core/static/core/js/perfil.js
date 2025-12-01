@@ -140,23 +140,25 @@ function showTemporaryMessage(text, type = 'info') {
 
         // --- INICIALIZACIÓN ---
 
-        window.addEventListener('load', function() {
-            document.getElementById('personal-info-form').onsubmit = saveProfile;
-            loadPaymentMethods();
-            loadPurchaseHistory();  // ← Añadir esta línea
-            switchTab('personal');
-            
-            document.addEventListener('click', (event) => {
-                const modal = document.getElementById('key-modal');
-                const modalContent = document.querySelector('#key-modal .modal-content');
-                if (modal && modal.classList.contains('flex') && !modalContent.contains(event.target)) {
-                    hideKeyModal();
-                }
-            });
-            
-            document.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape') {
-                    hideKeyModal();
-                }
-            });
-        });
+    window.addEventListener('load', function() {
+    document.getElementById('personal-info-form').onsubmit = saveProfile;
+    loadPaymentMethods();
+    loadPurchaseHistory();
+
+    // ⬅️ USAR EL TAB QUE LLEGÓ DESDE DJANGO
+    switchTab(initialTab);
+
+    document.addEventListener('click', (event) => {
+        const modal = document.getElementById('key-modal');
+        const modalContent = document.querySelector('#key-modal .modal-content');
+        if (modal && modal.classList.contains('flex') && !modalContent.contains(event.target)) {
+            hideKeyModal();
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            hideKeyModal();
+        }
+    });
+});

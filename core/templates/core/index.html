@@ -416,22 +416,22 @@ function renderGameSection(containerId, title, games) {
                             {{ request.session.user_username|default:"Usuario" }}
                         </div>
 
-<a href="{% url 'perfil_usuario' %}?tab=perfil" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
-    <i data-lucide="user-cog" class="w-4 h-4 mr-3 text-gray-500"></i>
-    Perfil
-</a>
+            <a href="{% url 'perfil_usuario' %}?tab=personal" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+                <i data-lucide="user-cog" class="w-4 h-4 mr-3 text-gray-500"></i>
+                Perfil
+            </a>
 
-            <a href="{% url 'perfil_usuario' %}?tab=metodos" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+            <a href="{% url 'perfil_usuario' %}?tab=payment" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
                 <i data-lucide="credit-card" class="w-4 h-4 mr-3 text-gray-500"></i>
                 Métodos de Pago
             </a>
 
-            <a href="{% url 'perfil_usuario' %}?tab=seguridad" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+            <a href="{% url 'perfil_usuario' %}?tab=security" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
                 <i data-lucide="shield" class="w-4 h-4 mr-3 text-gray-500"></i>
                 Seguridad
             </a>
 
-            <a href="{% url 'perfil_usuario' %}?tab=historial" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
+            <a href="{% url 'perfil_usuario' %}?tab=history" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition">
                 <i data-lucide="list-check" class="w-4 h-4 mr-3 text-gray-500"></i>
                 Historial
             </a>
