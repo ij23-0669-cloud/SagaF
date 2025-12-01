@@ -102,8 +102,8 @@
             const imageUrl = game.imagen_url || 'https://placehold.co/400x225/e5e5e5/333333?text=SAGA';
 
             return `
-                <div class="game-card bg-card-light rounded-xl shadow-lg overflow-hidden border border-gray-200 transition duration-300 hover:border-saga-red hover:shadow-xl hover:scale-[1.01] min-w-[280px] flex-shrink-0">
-                    <img src="${imageUrl}" alt="${(game.nombre || '').replace(/"/g,'')}" class="w-full object-cover" style="aspect-ratio: 2 / 3; height: auto;" onerror="this.onerror=null; this.src='https://placehold.co/400x600/e5e5e5/333333?text=SAGA';" />
+                    <div class="game-card bg-card-light rounded-xl shadow-lg overflow-hidden border border-gray-200 transition duration-300 hover:border-saga-red hover:shadow-xl hover:scale-[1.01] min-w-[180px] sm:min-w-[200px] md:min-w-[220px] lg:min-w-[240px] flex-shrink-0">                    
+                        <img src="${imageUrl}" alt="${(game.nombre || '').replace(/"/g,'')}" class="w-full object-cover" style="aspect-ratio: 2 / 3; height: auto;" onerror="this.onerror=null; this.src='https://placehold.co/400x600/e5e5e5/333333?text=SAGA';" />
 
                     <div class="p-4 space-y-3">
                         <h3 class="text-lg font-semibold text-gray-800 line-clamp-2">${game.nombre || '—'}</h3>
@@ -134,9 +134,8 @@
             const imageUrl = game.imagen_url || 'https://placehold.co/400x225/e5e5e5/333333?text=SAGA';
 
             return `
-                <article class="bg-card-light rounded-xl shadow-lg overflow-hidden border border-gray-200 transition duration-300 hover:border-saga-red hover:shadow-xl">
-                    <img src="${imageUrl}" alt="${(game.nombre || '').replace(/"/g,'')}" class="w-full object-cover" style="aspect-ratio: 2 / 3; height: auto;" onerror="this.onerror=null; this.src='https://placehold.co/400x600/e5e5e5/333333?text=SAGA';" />
-                    <div class="p-4 space-y-2">
+                <article class="bg-card-light rounded-xl shadow-lg overflow-hidden border border-gray-200 transition duration-300 hover:border-saga-red hover:shadow-xl w-full max-w-[180px] sm:max-w-[200px] md:max-w-[220px] lg:max-w-[240px] mx-auto">                    
+                    <img src="${imageUrl}" class="w-full object-cover rounded-b-none" style="aspect-ratio: 2 / 3;" />                    <div class="p-4 space-y-2">
                         <h3 class="text-base font-semibold text-gray-800 line-clamp-2">${game.nombre || '—'}</h3>
                         <p class="text-xs text-gray-500 font-mono">${game.plataforma || 'N/A'}</p>
                         <div class="flex items-center justify-between pt-2 gap-2">
@@ -165,7 +164,7 @@
             }
             container.innerHTML = `
                 <h2 class="text-3xl font-extrabold text-gray-900 mb-4">${title}</h2>
-                <div class="grid gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+<div class="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     ${games.map(createGridCardHtml).join('')}
                 </div>
             `;
